@@ -19,26 +19,11 @@ or prevent other mods from rendering correctly. Please be aware of these issues 
 
 ### Downloads
 
-You can find downloads for Sodium on either the [official CurseForge page](https://www.curseforge.com/minecraft/mc-mods/sodium)
-or through the [GitHub releases page](https://github.com/jellysquid3/sodium-fabric/releases). Usually, builds will be
-made available on GitHub slightly sooner than other locations.
+You can find downloads for Sodium on the [GitHub releases page](https://github.com/Pannoniae/sodium-forge/releases). 
 
 ### Community
 
-If you'd like to get help with the mod, check out the latest developments, or be notified when there's a new release,
-the Discord community might be for you! You can join the official server for my mods by clicking
-[here](https://jellysquid.me/discord).
-
-### Translations
-
-Translations to other languages are managed on [our OneSky site](https://jellysquid.oneskyapp.com/). If you're
-interested in improving language support for Sodium, you should also [join the Discord server](https://jellysquid.me/discord)
-to chat with other contributors. Each submitted translation requires either a number of approval votes from the community
-or approval from a reviewer in order to be included in the mod. 
-
-In the future, these translations will be automatically downloaded and included in the mod at compile time. For the time
-being you will need to manually export the translation files from OneSky and add them to the
-`src/main/resources/assets/sodium/lang` directory in order to see them in-game.
+The original creator has a discord server, which you can access by clicking [here](https://jellysquid.me/discord). Note that this fork is not officially supported in that discord.
 
 ### Building from source
 
@@ -62,22 +47,9 @@ or `./gradlew build` (macOS/Linux). If you are not using the Gradle wrapper, sim
 or the path to it.
 
 The initial setup may take a few minutes. After Gradle has finished building everything, you can find the resulting
-artifacts in `build/libs`.
-
-### Tuning for optimal performance
-
-_This section is entirely optional and is only aimed at users who are interested in squeezing out every drop from their
-game. Sodium will work without issue in the default configuration of almost all launchers._
-
-Generally speaking, newer versions of Java will provide better performance not only when playing Minecraft, but when
-using Sodium as well. The default configuration your game launcher provides will usually be some old version of Java 8
-that has been selected to maximize hardware compatibility instead of performance.
-
-For most users, these compatibility issues are not relevant, and it should be relatively easy to upgrade the game's Java
-runtime and apply the required patches. For more information on upgrading and tuning the Java runtime, see the
-guide [here](https://gist.github.com/jellysquid3/8a7b21e57f47f5711eb5697e282e502e).
+artifacts in `build/libs`
 
 ### License
 
 Sodium is licensed under GNU LGPLv3, a free and open-source license. For more information, please see the
-[license file](https://github.com/jellysquid3/sodium-fabric/blob/1.16.x/dev/LICENSE.txt).
+[license file](https://github.com/Pannoniae/sodium-forge/blob/1.16.x/dev/LICENSE.txt).
