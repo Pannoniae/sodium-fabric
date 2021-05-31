@@ -22,6 +22,7 @@
     "ai.pathing.MixinAbstractBlockState",
     "ai.pathing.MixinBlock",
     "ai.pathing.PathNodeNavigatorMixin",
+    "ai.poi.PointOfInterestStorageMixin",
     "ai.poi.PointOfInterestSetMixin",
     "ai.poi.PointOfInterestTypeMixin",
     "ai.poi.SerializingRegionBasedStorageMixin",
@@ -137,7 +138,8 @@
     "chunk.MixinProtoChunk",
     "world.MixinThreadedAnvilChunkStorage",
     "chunk.MixinChunkStatus",
-    "world.MixinChunkSerializer"
+    "world.MixinChunkSerializer",
+    "packetbuffer.PacketBufferMixin"
   ],
   "client": [
     "client.world.MixinClientWorld",

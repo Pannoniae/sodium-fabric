@@ -129,7 +129,7 @@ public class LithiumServerTickScheduler<T> extends ServerTickList<T> {
      * Returns the number of currently scheduled ticks.
      */
     @Override
-    public int func_225420_a() {
+    public int getSize() {
         int count = 0;
 
         for (TickEntry<T> entry : this.scheduledTicks.values()) {

@@ -15,9 +15,9 @@ public class PathNodeDefaults {
 
         // [VanillaCopy] LandPathNodeMaker#getNodeTypeFromNeighbors
         // Determine what kind of obstacle type this neighbor is
-        if (state.isIn(Blocks.CACTUS)) {
+        if (state.matchesBlock(Blocks.CACTUS)) {
             return PathNodeType.DANGER_CACTUS;
-        } else if (state.isIn(Blocks.SWEET_BERRY_BUSH)) {
+        } else if (state.matchesBlock(Blocks.SWEET_BERRY_BUSH)) {
             return PathNodeType.DANGER_OTHER;
         } else if (isFireDangerSource(state)) {
             return PathNodeType.DANGER_FIRE;
@@ -36,23 +36,23 @@ public class PathNodeDefaults {
         Block block = state.getBlock();
         Material material = state.getMaterial();
 
-        if (state.isIn(BlockTags.TRAPDOORS) || state.isIn(Blocks.LILY_PAD)) {
+        if (state.isIn(BlockTags.TRAPDOORS) || state.matchesBlock(Blocks.LILY_PAD)) {
             return PathNodeType.TRAPDOOR;
         }
 
-        if (state.isIn(Blocks.CACTUS)) {
+        if (state.matchesBlock(Blocks.CACTUS)) {
             return PathNodeType.DAMAGE_CACTUS;
         }
 
-        if (state.isIn(Blocks.SWEET_BERRY_BUSH)) {
+        if (state.matchesBlock(Blocks.SWEET_BERRY_BUSH)) {
             return PathNodeType.DAMAGE_OTHER;
         }
 
-        if (state.isIn(Blocks.HONEY_BLOCK)) {
+        if (state.matchesBlock(Blocks.HONEY_BLOCK)) {
             return PathNodeType.STICKY_HONEY;
         }
 
-        if (state.isIn(Blocks.COCOA)) {
+        if (state.matchesBlock(Blocks.COCOA)) {
             return PathNodeType.COCOA;
         }
 
@@ -97,6 +97,6 @@ public class PathNodeDefaults {
     }
 
     private static boolean isFireDangerSource(BlockState blockState) {
-        return blockState.isIn(BlockTags.FIRE) || blockState.isIn(Blocks.LAVA) || blockState.isIn(Blocks.MAGMA_BLOCK) || CampfireBlock.isLit(blockState);
+        return blockState.isIn(BlockTags.FIRE) || blockState.matchesBlock(Blocks.LAVA) || blockState.matchesBlock(Blocks.MAGMA_BLOCK) || CampfireBlock.isLit(blockState);
     }
 }

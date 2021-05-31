@@ -23,7 +23,7 @@ public interface CollisionViewMixin {
      * @author JellySquid
      */
     @Overwrite
-    default Stream<VoxelShape> getCollisionShapes(final Entity entity, AxisAlignedBB box) {
+    default Stream<VoxelShape> getBlockCollisionShapes(final Entity entity, AxisAlignedBB box) {
         return LithiumEntityCollisions.getBlockCollisions((ICollisionReader) this, entity, box, BlockCollisionPredicate.ANY);
     }
 

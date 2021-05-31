@@ -35,7 +35,6 @@ public class PortalForcerMixin {
 
         PointOfInterestManager poiStorage = this.world.getPointOfInterestManager();
         poiStorage.ensureLoadedAndValid(this.world, centerPos, searchRadius);
-
         Optional<BlockPos> ret = ((PointOfInterestDataExtended) poiStorage).findNearestInSquare(centerPos, searchRadius,
                 PointOfInterestType.NETHER_PORTAL, PointOfInterestManager.Status.ANY,
                 (poi) -> this.world.getBlockState(poi.getPos()).hasProperty(BlockStateProperties.HORIZONTAL_AXIS)

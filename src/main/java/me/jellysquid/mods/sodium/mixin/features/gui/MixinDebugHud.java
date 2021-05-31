@@ -78,7 +78,7 @@ public abstract class MixinDebugHud {
                 float x1 = right ? this.mc.getMainWindow().getScaledWidth() - 2 - width : 2;
                 float y1 = 2 + (height * i);
 
-                this.fontRenderer.func_238411_a_(string, x1, y1, 0xe0e0e0, false, modelMatrix, immediate,
+                this.fontRenderer.drawBidiString(string, x1, y1, 0xe0e0e0, false, modelMatrix, immediate,
                         false, 0, 15728880, this.fontRenderer.getBidiFlag());
             }
         }

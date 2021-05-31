@@ -72,7 +72,7 @@ public abstract class MixinClientWorld extends World {
     private void performBlockDisplayTick(BlockState blockState, BlockPos pos, Random random, boolean spawnBarrierParticles) {
         blockState.getBlock().animateTick(blockState, this, pos, random);
 
-        if (spawnBarrierParticles && blockState.isIn(Blocks.BARRIER)) {
+        if (spawnBarrierParticles && blockState.matchesBlock(Blocks.BARRIER)) {
             this.performBarrierDisplayTick(pos);
         }
     }

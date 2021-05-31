@@ -75,7 +75,8 @@ public class FluidRenderer {
         BlockState blockState = world.getBlockState(pos);
 
         if (blockState.isSolid()) {
-            VoxelShape shape = blockState.getRenderShapeTrue(world, pos);
+            //VoxelShape shape = blockState.getRenderShapeTrue(world, pos);
+            VoxelShape shape = blockState.getRenderShape(world, pos);
 
             // Hoist these checks to avoid allocating the shape below
             if (shape == VoxelShapes.fullCube()) {

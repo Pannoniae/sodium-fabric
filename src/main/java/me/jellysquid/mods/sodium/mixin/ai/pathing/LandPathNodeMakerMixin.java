@@ -55,7 +55,7 @@ public abstract class LandPathNodeMakerMixin {
      * @author JellySquid
      */
     @Overwrite
-    public static PathNodeType func_237232_a_(IBlockReader world, BlockPos.Mutable pos, PathNodeType type) {
+    public static PathNodeType getSurroundingDanger(IBlockReader world, BlockPos.Mutable pos, PathNodeType type) {
         int x = pos.getX();
         int y = pos.getY();
         int z = pos.getZ();

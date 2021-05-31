@@ -21,7 +21,7 @@ public abstract class MixinEntityRenderer<T extends Entity> implements EntityLig
     protected abstract int getBlockLight(T entity, BlockPos blockPos);
 
     @Shadow
-    protected abstract int func_239381_b_(T entity, BlockPos blockPos);
+    protected abstract int getSkyLight(T entity, BlockPos blockPos);
 
     @Inject(method = "getPackedLight", at = @At("HEAD"), cancellable = true)
     private void preGetLight(T entity, float tickDelta, CallbackInfoReturnable<Integer> cir) {
@@ -46,6 +46,6 @@ public abstract class MixinEntityRenderer<T extends Entity> implements EntityLig
 
     @Override
     public int bridge$getSkyLight(T entity, BlockPos pos) {
-        return this.func_239381_b_(entity, pos);
+        return this.getSkyLight(entity, pos);
     }
 }

@@ -151,7 +151,7 @@ public abstract class MixinChunkLightProvider<M extends LightDataMap<M>, S exten
     }
 
     private VoxelShape getOpaqueShapeFallback(BlockState state, int x, int y, int z, Direction dir) {
-        return VoxelShapes.getFaceShape(state.getRenderShapeTrue(this.chunkProvider.getWorld(), this.scratchPos.setPos(x, y, z)), dir);
+        return VoxelShapes.getFaceShape(state.getRenderShape(this.chunkProvider.getWorld(), this.scratchPos.setPos(x, y, z)), dir);
     }
 
     @Override
