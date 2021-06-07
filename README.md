@@ -1,3 +1,5 @@
+Curseforge link: https://www.curseforge.com/minecraft/mc-mods/sodium-reforged
+
 ![Project icon](https://git-assets.jellysquid.me/hotlink-ok/sodium/icon-rounded-128px.png)
 
 Please see https://github.com/spoorn/sodium-forge for a slightly more up-to-date version. :)
