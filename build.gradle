@@ -4,14 +4,19 @@ buildscript {
         jcenter()
         mavenCentral()
         maven {url='https://repo.spongepowered.org/maven'}
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
     }
     dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '4.+', changing: true
         classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+        classpath "io.freefair.gradle:lombok-plugin:6.0.0-m2"
     }
 }
 apply plugin: 'net.minecraftforge.gradle'
 // Only edit below this line, the above code adds and enables the necessary things for Forge to be setup.
+apply plugin: "io.freefair.lombok"
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 repositories {
@@ -126,6 +131,8 @@ dependencies {
     /*compileOnly fg.deobf(project.dependencies.create("dev.ftb.mods:ftb-chunks:${ftb_chunks_version}") {
         transitive = false
     })*/
+
+    annotationProcessor 'org.spongepowered:mixin:0.8.2:processor'
 }
 
 afterEvaluate {

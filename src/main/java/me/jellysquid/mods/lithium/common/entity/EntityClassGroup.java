@@ -1,6 +1,7 @@
 package me.jellysquid.mods.lithium.common.entity;
 
 import it.unimi.dsi.fastutil.objects.Reference2ByteOpenHashMap;
+import lombok.extern.log4j.Log4j2;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.minecart.MinecartEntity;
 import net.minecraft.entity.monster.ShulkerEntity;
@@ -18,6 +19,7 @@ import java.util.logging.Logger;
  *
  * @author 2No2Name
  */
+ @Log4j2
 public class EntityClassGroup {
     public static final EntityClassGroup BOAT_SHULKER_LIKE_COLLISION; //aka entities that other entities will do block-like collisions with when moving
     public static final EntityClassGroup MINECART_BOAT_LIKE_COLLISION; //aka entities that will attempt to collide with all other entities when moving
@@ -26,7 +28,7 @@ public class EntityClassGroup {
         //String remapped_method_30948 = FabricLoader.getInstance().getMappingResolver().mapMethodName("intermediary", "net.minecraft.class_1297", "method_30948", "()Z");
         String remapped_method_30948 = ObfuscationReflectionHelper.findMethod(Entity.class, "func_241845_aY").getName();
         BOAT_SHULKER_LIKE_COLLISION = new EntityClassGroup(
-                (Class<?> entityClass) -> isMethodFromSuperclassOverwritten(entityClass, Entity.class, "func_241845_aY"));
+                (Class<?> entityClass) -> isMethodFromSuperclassOverwritten(entityClass, Entity.class, remapped_method_30948));
 
 
         //String remapped_method_30949 = FabricLoader.getInstance().getMappingResolver().mapMethodName("intermediary", "net.minecraft.class_1297", "method_30949", "(Lnet/minecraft/class_1297;)Z");
@@ -99,6 +101,9 @@ public class EntityClassGroup {
                 return true;
             } catch (NoSuchMethodException e) {
                 clazz = clazz.getSuperclass();
+            } catch (RuntimeException ex) {
+                log.warn("Failed to load class={} while looking for superclass overrides on {}", clazz.getName(), superclass.getName());
+                return false;
             }
         }
         return false;
