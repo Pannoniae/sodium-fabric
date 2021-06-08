@@ -26,7 +26,7 @@ repositories {
     }
 }
 
-version = '2.1'
+version = mod_version
 group = 'me.jellysquid.mods.sodium' // http://maven.apache.org/guides/mini/guide-naming-conventions.html
 archivesBaseName = 'sodium-forge'
 
