@@ -44,7 +44,6 @@ public class SodiumMixinPlugin implements IMixinConfigPlugin {
 
             return false;
         }
-
         String mixin = mixinClassName.substring(MIXIN_PACKAGE_ROOT.length());
         Option option = this.config.getEffectiveOptionForMixin(mixin);
 
@@ -53,7 +52,6 @@ public class SodiumMixinPlugin implements IMixinConfigPlugin {
 
             return false;
         }
-
         if (option.isOverridden()) {
             String source = "[unknown]";
 
@@ -73,13 +71,16 @@ public class SodiumMixinPlugin implements IMixinConfigPlugin {
         }
 
         // mod compat
-        try {
-            Class.forName("com.minecraftabnormals.abnormals_core.core.AbnormalsCore", false, SodiumMixinPlugin.class.getClassLoader());
-            if (mixinClassName.equals("me.jellysquid.mods.sodium.mixin.features.world_ticking.MixinClientWorld")) {
-                return false;
-            }
-        } catch(ClassNotFoundException e) {
-            //yeah abnormalscore isn't there, do nothing
+        if ("me.jellysquid.mods.sodium.mixin.features.world_ticking.MixinClientWorld".equals(mixinClassName)
+            && classExists("com.minecraftabnormals.abnormals_core.core.AbnormalsCore")) {
+            logger.warn("Disabling MixinClientWorld due to conflict with AbnormalsCore");
+            return false;
+        }
+
+        if ("me.jellysquid.mods.sodium.mixin.gen.fast_island_noise.TheEndBiomeSourceMixin".equals(mixinClassName)
+            && classExists("jpg.k.simplyimprovedterrain.mixin.MixinEndBiomeProvider")) {
+            logger.warn("Disabling TheEndBiomeSourceMixin due to conflict with simplyimprovedterrain");
+            return false;
         }
 
         return option.isEnabled();
@@ -102,5 +103,14 @@ public class SodiumMixinPlugin implements IMixinConfigPlugin {
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
 
+    }
+
+    public boolean classExists(String classPath) {
+        try {
+            Class.forName(classPath, false, SodiumMixinPlugin.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 }
