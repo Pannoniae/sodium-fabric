@@ -29,6 +29,8 @@ public class TheEndBiomeSourceMixin {
     /**
      * Use our fast cache instead of vanilla's uncached noise generation.
      *
+     * ### Check Updates
+     *
      * This is not required due to https://github.com/spoorn/sodium-forge/issues/3.
      */
     @Redirect(method = "getNoiseBiome(III)Lnet/minecraft/world/biome/Biome;", at = @At(value = "INVOKE",
