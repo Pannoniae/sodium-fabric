@@ -78,7 +78,8 @@ public class SodiumMixinPlugin implements IMixinConfigPlugin {
         }
 
         if ("me.jellysquid.mods.sodium.mixin.gen.fast_island_noise.TheEndBiomeSourceMixin".equals(mixinClassName)
-            && classExists("jpg.k.simplyimprovedterrain.mixin.MixinEndBiomeProvider")) {
+            && (classExists("jpg.k.simplyimprovedterrain.mixin.MixinEndBiomeProvider")
+                || classExists("jpg.k.simplyimprovedterrain.SimplyImprovedTerrain"))) {
             logger.warn("Disabling TheEndBiomeSourceMixin due to conflict with simplyimprovedterrain");
             return false;
         }

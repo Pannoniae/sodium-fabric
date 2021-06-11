@@ -35,6 +35,12 @@ description='''
 Sodium is an free and open-source optimization mod for Minecraft which improves frame rates and reduces lag spikes.
 '''
 # A dependency - use the . to indicate dependency for a specific modid. Dependencies are optional.
+[[dependencies.sodium]]
+    modId="simplyimprovedterrain"
+    mandatory=false
+    versionRange="[0,)"
+    ordering="BEFORE"
+    side="BOTH"
 [[dependencies.examplemod]] #optional
     # the modid of the dependency
     modId="forge" #mandatory
