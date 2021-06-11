@@ -101,7 +101,7 @@ public class EntityClassGroup {
                 return true;
             } catch (NoSuchMethodException e) {
                 clazz = clazz.getSuperclass();
-            } catch (RuntimeException ex) {
+            } catch (Exception ex) {
                 log.warn("Failed to load class={} while looking for superclass overrides on {}", clazz.getName(), superclass.getName());
                 return false;
             }

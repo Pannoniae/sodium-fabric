@@ -294,6 +294,9 @@ public class SodiumConfig {
             writer.write("# https://github.com/jellysquid3/sodium-fabric/wiki/Configuration-File\n");
             writer.write("#\n");
             writer.write("# By default, this file will be empty except for this notice.\n");
+            writer.write("#\n");
+            writer.write("# Uncomment below line for vanilla seed gen parity\n");
+            writer.write("# mixin.gen.fast_layer_sampling=false\n");
         }
     }
 
