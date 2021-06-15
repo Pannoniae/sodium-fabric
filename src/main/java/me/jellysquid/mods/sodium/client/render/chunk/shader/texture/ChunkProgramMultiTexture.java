@@ -68,6 +68,7 @@ public class ChunkProgramMultiTexture extends ChunkProgramTextureComponent {
     public void delete() {
         this.blockTexSampler.delete();
         this.blockTexMippedSampler.delete();
+        this.lightTexSampler.delete();
     }
 
     @Override

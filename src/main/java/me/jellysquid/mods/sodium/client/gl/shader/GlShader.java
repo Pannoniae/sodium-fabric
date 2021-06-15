@@ -24,6 +24,9 @@ public class GlShader extends GlObject {
         src = processShader(src, constants);
 
         int handle = GL20.glCreateShader(type.id);
+        if (handle == 0) {
+            throw new RuntimeException("Error creating shader of type " + type.name());
+        }
         GL20.glShaderSource(handle, src);
         GL20.glCompileShader(handle);
 

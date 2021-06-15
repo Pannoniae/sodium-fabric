@@ -102,6 +102,7 @@ public class SodiumConfig {
         
         this.addMixinRule("core", true); // TODO: Don't actually allow the user to disable this
 
+        this.addMixinRule("features", true);
         this.addMixinRule("features.block", true);
         this.addMixinRule("features.buffer_builder", true);
         this.addMixinRule("features.buffer_builder.fast_advance", true);

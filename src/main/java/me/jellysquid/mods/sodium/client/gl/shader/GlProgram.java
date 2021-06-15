@@ -1,6 +1,7 @@
 package me.jellysquid.mods.sodium.client.gl.shader;
 
 import com.mojang.blaze3d.matrix.MatrixStack;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.jellysquid.mods.sodium.client.gl.GlObject;
 import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexAttribute;
 import net.minecraft.util.ResourceLocation;
@@ -8,6 +9,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
+
+import java.util.function.IntConsumer;
 
 /**
  * An OpenGL shader program.
@@ -71,6 +74,7 @@ public abstract class GlProgram extends GlObject {
     }
 
     public void delete() {
+        unbind();
         GL20.glDeleteProgram(this.handle());
 
         this.invalidateHandle();
@@ -79,15 +83,17 @@ public abstract class GlProgram extends GlObject {
     public static class Builder {
         private final ResourceLocation name;
         private final int program;
+        private final IntArrayList shaderIds;
 
         public Builder(ResourceLocation name) {
             this.name = name;
             this.program = GL20.glCreateProgram();
+            this.shaderIds = new IntArrayList();
         }
 
         public Builder attachShader(GlShader shader) {
             GL20.glAttachShader(this.program, shader.handle());
-
+            shaderIds.add(shader.handle());
             return this;
         }
 
@@ -108,12 +114,15 @@ public abstract class GlProgram extends GlObject {
             if (!log.isEmpty()) {
                 LOGGER.warn("Program link log for " + this.name + ": " + log);
             }
-
             int result = GL20.glGetProgrami(this.program, GL20.GL_LINK_STATUS);
+            GL20.glValidateProgram(this.program);
+            result &= GL20.glGetProgrami(this.program, GL20.GL_VALIDATE_STATUS);
 
             if (result != GL11.GL_TRUE) {
                 throw new RuntimeException("Shader program linking failed, see log for details");
             }
+
+            shaderIds.forEach((IntConsumer) id -> GL20.glDetachShader(this.program, id));
 
             return factory.create(this.name, this.program);
         }
