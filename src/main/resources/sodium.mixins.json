@@ -23,6 +23,7 @@
     "ai.pathing.MixinBlock",
     "ai.pathing.PathNodeNavigatorMixin",
     "ai.poi.PointOfInterestSetMixin",
+    "ai.poi.PointOfInterestStorageMixin",
     "ai.poi.PointOfInterestTypeMixin",
     "ai.poi.SerializingRegionBasedStorageMixin",
     "ai.poi.fast_portals.PortalForcerMixin",
