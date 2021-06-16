@@ -112,7 +112,11 @@ public class ChunkAwareBlockCollisionSweeper {
                         }
                     }
                     //Casting to Chunk is not checked, together with other mods this could cause a ClassCastException
-                    this.cachedChunk = (IChunk) this.view.getBlockReader(this.chunkX, this.chunkZ);
+                    try {
+                        this.cachedChunk = (IChunk) this.view.getBlockReader(this.chunkX, this.chunkZ);
+                    } catch (Exception e) {
+                        
+                    }
                     if (this.cachedChunk != null) {
                         this.cachedChunkSection = this.cachedChunk.getSections()[this.chunkY];
                     }
