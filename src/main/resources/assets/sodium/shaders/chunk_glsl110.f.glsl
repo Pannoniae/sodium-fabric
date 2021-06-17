@@ -55,7 +55,7 @@ void main() {
     // We should try to fix this outside of shader code
     // This re-implements the glAlphaFunc call that Minecraft uses for cutout rendering
     if (sampleBlockTex.a < 0.05) {
-        discard;
+        sampleBlockTex.a = 0.0;
     }
 
     // Light map texture sample
