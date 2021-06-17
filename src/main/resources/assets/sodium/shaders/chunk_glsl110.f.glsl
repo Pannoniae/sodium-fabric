@@ -54,8 +54,8 @@ void main() {
     // TODO: Mipmap textures have partial transparency and render as black
     // We should try to fix this outside of shader code
     // This re-implements the glAlphaFunc call that Minecraft uses for cutout rendering
-    if (sampleBlockTex.a < 0.5) {
-        sampleBlockTex.a = 0.0;
+    if (sampleBlockTex.a < 0.05) {
+        discard;
     }
 
     // Light map texture sample
