@@ -1,5 +1,7 @@
 ![Project icon](https://git-assets.jellysquid.me/hotlink-ok/sodium/icon-rounded-128px.png)
 
+Please see https://github.com/spoorn/sodium-forge for a slightly more up-to-date version. :)
+
 # Sodium/Lithium/Phosphor (Forge fork)
 ![GitHub license](https://img.shields.io/github/license/jellysquid3/sodium-fabric.svg)
 ![GitHub tag](https://img.shields.io/github/tag/jellysquid3/sodium-fabric.svg)
