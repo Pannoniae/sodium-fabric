@@ -24,6 +24,7 @@
     "ai.pathing.PathNodeNavigatorMixin",
     "ai.poi.PointOfInterestStorageMixin",
     "ai.poi.PointOfInterestSetMixin",
+    "ai.poi.PointOfInterestStorageMixin",
     "ai.poi.PointOfInterestTypeMixin",
     "ai.poi.SerializingRegionBasedStorageMixin",
     "ai.poi.fast_portals.PortalForcerMixin",
