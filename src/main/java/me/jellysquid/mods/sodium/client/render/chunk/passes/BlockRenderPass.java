@@ -1,37 +1,43 @@
 package me.jellysquid.mods.sodium.client.render.chunk.passes;
 
-import net.minecraft.util.ResourceLocation;
+import lombok.Getter;
+import net.minecraft.client.renderer.RenderType;
 
-public abstract class BlockRenderPass {
-    private final ResourceLocation id;
-    private final BlockLayer[] layers;
-    private final boolean forward;
-    private final int ordinal;
+// TODO: Move away from using an enum, make this extensible
+public enum BlockRenderPass {
+    SOLID(RenderType.getSolid(), false),
+    CUTOUT(RenderType.getCutout(), false),
+    CUTOUT_MIPPED(RenderType.getCutoutMipped(), false),
+    TRANSLUCENT(RenderType.getTranslucent(), true),
+    TRIPWIRE(RenderType.getTripwire(), true);
 
-    public BlockRenderPass(int ordinal, ResourceLocation id, boolean forward, BlockLayer... layers) {
-        this.ordinal = ordinal;
-        this.id = id;
-        this.layers = layers;
-        this.forward = forward;
+    public static final BlockRenderPass[] VALUES = BlockRenderPass.values();
+    public static final BlockRenderPass[] TRANSLUCENTS = new BlockRenderPass[2];
+    public static final int COUNT = VALUES.length;
+
+    static {
+        TRANSLUCENTS[0] = TRANSLUCENT;
+        TRANSLUCENTS[1] = TRIPWIRE;
     }
 
-    public abstract void beginRender();
+    @Getter
+    private final RenderType layer;
+    private final boolean translucent;
 
-    public abstract void endRender();
-
-    public final boolean isForwardRendering() {
-        return this.forward;
+    BlockRenderPass(RenderType layer, boolean translucent) {
+        this.layer = layer;
+        this.translucent = translucent;
     }
 
-    public final int ordinal() {
-        return this.ordinal;
+    public final boolean isTranslucent() {
+        return this.translucent;
     }
 
-    public final BlockLayer[] getLayers() {
-        return this.layers;
+    public void endDrawing() {
+        this.layer.clearRenderState();
     }
 
-    public final ResourceLocation getId() {
-        return this.id;
+    public void startDrawing() {
+        this.layer.setupRenderState();
     }
 }

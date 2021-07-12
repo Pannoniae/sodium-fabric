@@ -13,7 +13,7 @@ import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.WorldVertexBufferUploader;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.util.SoundEvents;
-import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20C;
 
 import java.util.function.Consumer;
 
@@ -28,7 +28,7 @@ public abstract class AbstractWidget implements IRenderable, IGuiEventListener {
         this.font.drawString(matrixStack, str, x, y, color);
     }
 
-    protected void drawRect(int x1, int y1, int x2, int y2, int color) {
+    protected void drawRect(double x1, double y1, double x2, double y2, int color) {
         float a = (float) (color >> 24 & 255) / 255.0F;
         float r = (float) (color >> 16 & 255) / 255.0F;
         float g = (float) (color >> 8 & 255) / 255.0F;
@@ -43,7 +43,7 @@ public abstract class AbstractWidget implements IRenderable, IGuiEventListener {
         RenderSystem.defaultBlendFunc();
 
         BufferBuilder bufferBuilder = Tessellator.getInstance().getBuffer();
-        bufferBuilder.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
+        bufferBuilder.begin(GL20C.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
 
         consumer.accept(bufferBuilder);
 
@@ -54,7 +54,7 @@ public abstract class AbstractWidget implements IRenderable, IGuiEventListener {
         RenderSystem.disableBlend();
     }
 
-    protected static void addQuad(IVertexBuilder consumer, int x1, int y1, int x2, int y2, float a, float r, float g, float b) {
+    protected static void addQuad(IVertexBuilder consumer, double x1, double y1, double x2, double y2, float a, float r, float g, float b) {
         consumer.pos(x2, y1, 0.0D).color(r, g, b, a).endVertex();
         consumer.pos(x1, y1, 0.0D).color(r, g, b, a).endVertex();
         consumer.pos(x1, y2, 0.0D).color(r, g, b, a).endVertex();

@@ -3,6 +3,9 @@ package me.jellysquid.mods.sodium.client.render.chunk.data;
 import net.minecraft.util.math.SectionPos;
 
 public class ChunkRenderBounds {
+    public static final ChunkRenderBounds ALWAYS_FALSE = new ChunkRenderBounds(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY,
+            Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY);
+
     public final float x1, y1, z1;
     public final float x2, y2, z2;
 
@@ -27,54 +30,52 @@ public class ChunkRenderBounds {
     }
 
     public static class Builder {
-        private int x1 = Integer.MAX_VALUE, y1 = Integer.MAX_VALUE, z1 = Integer.MAX_VALUE;
-        private int x2 = Integer.MIN_VALUE, y2 = Integer.MIN_VALUE, z2 = Integer.MIN_VALUE;
-
-        private boolean empty = true;
+        // Bit-mask of the blocks set on each axis
+        private int x = 0, y = 0, z = 0;
 
         public void addBlock(int x, int y, int z) {
-            if (x < this.x1) {
-                this.x1 = x;
-            }
-
-            if (x > this.x2) {
-                this.x2 = x;
-            }
-
-            if (y < this.y1) {
-                this.y1 = y;
-            }
-
-            if (y > this.y2) {
-                this.y2 = y;
-            }
-
-            if (z < this.z1) {
-                this.z1 = z;
-            }
-
-            if (z > this.z2) {
-                this.z2 = z;
-            }
-
-            this.empty = false;
+            // Accumulate bits on each axis for the given block position. This avoids needing to
+            // branch multiple times trying to determine if the bounds need to grow. The min/max
+            // value of each axis can later be extracted by counting the trailing/leading zeroes.
+            this.x |= 1 << x;
+            this.y |= 1 << y;
+            this.z |= 1 << z;
         }
 
         public ChunkRenderBounds build(SectionPos origin) {
-            if (this.empty) {
+            // If no bits were set on any axis, return the default bounds
+            if ((this.x | this.y | this.z) == 0) {
                 return new ChunkRenderBounds(origin);
             }
 
-            // Expand the bounding box by 8 blocks (half a chunk) in order to deal with diagonal surfaces
-            return new ChunkRenderBounds(
-                    Math.max(this.x1, origin.getWorldStartX()) - 8.0f,
-                    Math.max(this.y1, origin.getWorldStartY()) - 8.0f,
-                    Math.max(this.z1, origin.getWorldStartZ()) - 8.0f,
+            int x1 = origin.getWorldStartX() + leftBound(this.x);
+            int x2 = origin.getWorldEndX() + rightBound(this.x);
 
-                    Math.min(this.x2 + 1, origin.getWorldEndX()) + 8.0f,
-                    Math.min(this.y2 + 1, origin.getWorldEndY()) + 8.0f,
-                    Math.min(this.z2 + 1, origin.getWorldEndZ()) + 8.0f
+            int y1 = origin.getWorldStartY() + leftBound(this.y);
+            int y2 = origin.getWorldEndY() + rightBound(this.y);
+
+            int z1 = origin.getWorldStartZ() + leftBound(this.z);
+            int z2 = origin.getWorldEndZ() + rightBound(this.z);
+
+            return new ChunkRenderBounds(
+                    Math.max(x1, origin.getWorldStartX()) - 0.5f,
+                    Math.max(y1, origin.getWorldStartY()) - 0.5f,
+                    Math.max(z1, origin.getWorldStartZ()) - 0.5f,
+
+                    Math.min(x2, origin.getWorldEndX()) + 0.5f,
+                    Math.min(y2, origin.getWorldEndY()) + 0.5f,
+                    Math.min(z2, origin.getWorldEndZ()) + 0.5f
             );
+        }
+
+        // Return the left-bound of the bit-masked axis
+        private static int leftBound(int i) {
+            return Integer.numberOfTrailingZeros(i);
+        }
+
+        // Return the right-bound of the bit-masked axis
+        private static int rightBound(int i) {
+            return 32 - Integer.numberOfLeadingZeros(i);
         }
     }
 }

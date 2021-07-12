@@ -25,12 +25,14 @@ public class MetricsUtil {
 
     public static void endMetric(String name) {
         Triple<Float, Long, Long> t = METRICS.get(name);
+        if (t == null)
+            throw new RuntimeException("Metrics needs to be started first!");
         float f = t.getLeft();
         long m = t.getMiddle();
         long l = t.getRight();
         if (l < 0)
             throw new RuntimeException("Metrics needs to be started first!");
-        f = f * ((float)m/(m + 1)) + (float)(System.currentTimeMillis()+100 - l)/l;
+        f = ((f * m) + (float)(System.currentTimeMillis() - l))/(m+1);
         METRICS.put(name, Triple.of(f, m + 1, -1L));
     }
 

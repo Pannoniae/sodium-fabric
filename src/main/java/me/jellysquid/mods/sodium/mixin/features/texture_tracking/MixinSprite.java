@@ -44,6 +44,7 @@ public abstract class MixinSprite implements SpriteExtended {
 
         boolean onDemand = SodiumClientMod.options().advanced.animateOnlyVisibleTextures;
 
+        // TODO: Update texture if this is for an item held in hand/inventory
         if (!onDemand || this.forceNextUpdate) {
             this.uploadTexture();
         }

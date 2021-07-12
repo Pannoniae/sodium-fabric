@@ -1,7 +1,9 @@
 package me.jellysquid.mods.sodium.mixin.features.gui.font;
 
 import com.mojang.blaze3d.vertex.IVertexBuilder;
-import me.jellysquid.mods.sodium.client.model.consumer.GlyphVertexConsumer;
+import me.jellysquid.mods.sodium.client.model.vertex.VanillaVertexTypes;
+import me.jellysquid.mods.sodium.client.model.vertex.VertexDrain;
+import me.jellysquid.mods.sodium.client.model.vertex.formats.glyph.GlyphVertexSink;
 import me.jellysquid.mods.sodium.client.util.color.ColorABGR;
 import net.minecraft.client.gui.fonts.TexturedGlyph;
 import net.minecraft.util.math.vector.Matrix4f;
@@ -61,10 +63,13 @@ public class MixinGlyphRenderer {
 
         int color = ColorABGR.pack(red, green, blue, alpha);
 
-        GlyphVertexConsumer glyphs = ((GlyphVertexConsumer) vertexConsumer);
-        glyphs.vertexGlyph(matrix, x1 + w1, h1, 0.0F, color, this.u0, this.v0, light);
-        glyphs.vertexGlyph(matrix, x1 + w2, h2, 0.0F, color, this.u0, this.v1, light);
-        glyphs.vertexGlyph(matrix, x2 + w2, h2, 0.0F, color, this.u1, this.v1, light);
-        glyphs.vertexGlyph(matrix, x2 + w1, h1, 0.0F, color, this.u1, this.v0, light);
+        GlyphVertexSink drain = VertexDrain.of(vertexConsumer)
+                .createSink(VanillaVertexTypes.GLYPHS);
+        drain.ensureCapacity(4);
+        drain.writeGlyph(matrix, x1 + w1, h1, 0.0F, color, this.u0, this.v0, light);
+        drain.writeGlyph(matrix, x1 + w2, h2, 0.0F, color, this.u0, this.v1, light);
+        drain.writeGlyph(matrix, x2 + w2, h2, 0.0F, color, this.u1, this.v1, light);
+        drain.writeGlyph(matrix, x2 + w1, h1, 0.0F, color, this.u1, this.v0, light);
+        drain.flush();
     }
 }

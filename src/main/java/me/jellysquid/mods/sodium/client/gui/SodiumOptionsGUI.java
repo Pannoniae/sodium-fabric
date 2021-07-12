@@ -7,13 +7,11 @@ import me.jellysquid.mods.sodium.client.gui.options.control.ControlElement;
 import me.jellysquid.mods.sodium.client.gui.options.storage.OptionStorage;
 import me.jellysquid.mods.sodium.client.gui.widgets.FlatButtonWidget;
 import me.jellysquid.mods.sodium.client.util.Dim2i;
-import net.minecraft.client.GameSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.IGuiEventListener;
 import net.minecraft.client.gui.IRenderable;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.VideoSettingsScreen;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.util.IReorderingProcessor;
 import net.minecraft.util.text.*;
 import org.lwjgl.glfw.GLFW;
@@ -78,12 +76,9 @@ public class SodiumOptionsGUI extends Screen {
         this.rebuildGUIPages();
         this.rebuildGUIOptions();
 
-        this.undoButton = new FlatButtonWidget(new Dim2i(this.width - 211, this.height - 30, 65, 20),
-                I18n.format("sodium.options.buttons.undo"), this::undoChanges);
-        this.applyButton = new FlatButtonWidget(new Dim2i(this.width - 142, this.height - 30, 65, 20),
-                I18n.format("sodium.options.buttons.apply"), this::applyChanges);
-        this.closeButton = new FlatButtonWidget(new Dim2i(this.width - 73, this.height - 30, 65, 20),
-                I18n.format("sodium.options.buttons.close"), this::closeScreen);
+        this.undoButton = new FlatButtonWidget(new Dim2i(this.width - 211, this.height - 26, 65, 20), "Undo", this::undoChanges);
+        this.applyButton = new FlatButtonWidget(new Dim2i(this.width - 142, this.height - 26, 65, 20), "Apply", this::applyChanges);
+        this.closeButton = new FlatButtonWidget(new Dim2i(this.width - 73, this.height - 26, 65, 20), "Close", this::onClose);
 
         this.children.add(this.undoButton);
         this.children.add(this.applyButton);
@@ -97,13 +92,13 @@ public class SodiumOptionsGUI extends Screen {
     }
 
     private void rebuildGUIPages() {
-        int x = 10;
+        int x = 6;
         int y = 6;
 
         for (OptionPage page : this.pages) {
-            int width = 10 + this.font.getStringWidth(page.getName());
+            int width = 12 + this.font.getStringWidth(page.getName());
 
-            FlatButtonWidget button = new FlatButtonWidget(new Dim2i(x, y, width, 16), page.getName(), () -> this.setPage(page));
+            FlatButtonWidget button = new FlatButtonWidget(new Dim2i(x, y, width, 18), page.getName(), () -> this.setPage(page));
             button.setSelected(this.currentPage == page);
 
             x += width + 6;
@@ -113,7 +108,7 @@ public class SodiumOptionsGUI extends Screen {
     }
 
     private void rebuildGUIOptions() {
-        int x = 10;
+        int x = 6;
         int y = 28;
 
         for (OptionGroup group : this.currentPage.getGroups()) {

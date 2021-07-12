@@ -1,8 +1,7 @@
 package me.jellysquid.mods.sodium.client.render.chunk.shader;
 
-import me.jellysquid.mods.sodium.client.gl.util.GlFogHelper;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL20;
+import me.jellysquid.mods.sodium.client.gl.compat.LegacyFogHelper;
+import org.lwjgl.opengl.GL20C;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.FloatBuffer;
@@ -17,16 +16,8 @@ import java.nio.FloatBuffer;
  * but as the name implies, this only works on graphics cards produced by NVIDIA. The shader implementation however does
  * not depend on any vendor-specific extensions and is written using very simple GLSL code.
  */
-public abstract class ChunkShaderFogComponent implements ShaderComponent {
-    @Override
-    public void unbind() {
-        // NO-OP
-    }
-
-    @Override
-    public void delete() {
-        // NO-OP
-    }
+public abstract class ChunkShaderFogComponent {
+    public abstract void setup();
 
     public static class None extends ChunkShaderFogComponent {
         public None(ChunkProgram program) {
@@ -34,7 +25,7 @@ public abstract class ChunkShaderFogComponent implements ShaderComponent {
         }
 
         @Override
-        public void bind() {
+        public void setup() {
 
         }
     }
@@ -49,10 +40,10 @@ public abstract class ChunkShaderFogComponent implements ShaderComponent {
         }
 
         @Override
-        public void bind() {
+        public void setup() {
             ChunkShaderFogComponent.setupColorUniform(this.uFogColor);
 
-            GL20.glUniform1f(this.uFogDensity, GlFogHelper.getFogDensity());
+            GL20C.glUniform1f(this.uFogDensity, LegacyFogHelper.getFogDensity());
         }
     }
 
@@ -68,14 +59,14 @@ public abstract class ChunkShaderFogComponent implements ShaderComponent {
         }
 
         @Override
-        public void bind() {
+        public void setup() {
             ChunkShaderFogComponent.setupColorUniform(this.uFogColor);
 
-            float end = GlFogHelper.getFogEnd();
-            float start = GlFogHelper.getFogStart();
+            float end = LegacyFogHelper.getFogEnd();
+            float start = LegacyFogHelper.getFogStart();
 
-            GL20.glUniform1f(this.uFogLength, end - start);
-            GL20.glUniform1f(this.uFogEnd, end);
+            GL20C.glUniform1f(this.uFogLength, end - start);
+            GL20C.glUniform1f(this.uFogEnd, end);
         }
     }
 
@@ -85,9 +76,9 @@ public abstract class ChunkShaderFogComponent implements ShaderComponent {
      */
     private static void setupColorUniform(int index) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            FloatBuffer bufFogColor = stack.mallocFloat(4);
-            GL11.glGetFloatv(GL11.GL_FOG_COLOR, bufFogColor);
-            GL20.glUniform4fv(index, bufFogColor);
+            FloatBuffer buf = stack.mallocFloat(4);
+            LegacyFogHelper.getFogColor(buf);
+            GL20C.glUniform4fv(index, buf);
         }
     }
 

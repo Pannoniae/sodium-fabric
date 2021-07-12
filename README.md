@@ -72,6 +72,53 @@ For most users, these compatibility issues are not relevant, and it should be re
 runtime and apply the required patches. For more information on upgrading and tuning the Java runtime, see the
 guide [here](https://gist.github.com/jellysquid3/8a7b21e57f47f5711eb5697e282e502e).
 
+### Community
+[![Discord chat](https://img.shields.io/badge/chat%20on-discord-7289DA)](https://jellysquid.me/discord)
+
+We have an [official Discord community](https://jellysquid.me/discord) for all of our projects. By joining, you can:
+- Get installation help and technical support with all of our mods 
+- Be notified of the latest developments as they happen
+- Get involved and collaborate with the rest of our team
+- ... and just hang out with the rest of our community.
+
+### Building from sources
+
+#### Requirements
+
+- JRE 8 or newer (for running Gradle)
+- JDK 8 (optional)
+  - If you neither have JDK 8 available on your shell's path or installed through a supported package manager (such as
+[SDKMAN](https://sdkman.io)), Gradle will automatically download a suitable toolchain from the [AdoptOpenJDK project](https://adoptopenjdk.net/)
+and use it to compile the project. For more information on what package managers are supported and how you can
+customize this behavior on a system-wide level, please see [Gradle's Toolchain user guide](https://docs.gradle.org/current/userguide/toolchains.html).
+- Gradle 6.7 or newer (optional)
+  - The [Gradle wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html#sec:using_wrapper) is provided in
+    this repository can be used instead of installing a suitable version of Gradle yourself. However, if you are building
+    many projects, you may prefer to install it yourself through a suitable package manager as to save disk space and to
+    avoid many different Gradle daemons sitting around in memory.
+
+#### Building with Gradle
+
+Sodium uses a typical Gradle project structure and can be built by simply running the default `build` task.
+
+**Tip:** If this is a one-off build, and you would prefer the Gradle daemon does not stick around in memory afterwards 
+(often consuming upwards of 1 GiB), then you can use the [`--no-daemon` argument](https://docs.gradle.org/current/userguide/gradle_daemon.html#sec:disabling_the_daemon)
+to ensure that the daemon is torn down after the build is complete. However, subsequent Gradle builds will
+[start more slowly](https://docs.gradle.org/current/userguide/gradle_daemon.html#sec:why_the_daemon) if the Gradle
+daemon is not sitting warm and loaded in memory.
+
+After Gradle finishes building the project, the resulting build artifacts (your usual mod binaries, and
+their sources) can be found in `build/libs`.
+
+Build artifacts classified with `dev` are outputs containing the sources and compiled classes
+before they are remapped into stable intermediary names. If you are working in a developer environment and would
+like to add the mod to your game, you should prefer to use the `modRuntime` or `modCompile` configurations provided by
+Loom instead of these outputs.
+
+Please note that support is not provided for setting up build environments or compiling the mod. We ask that
+users who are looking to get their hands dirty with the code have a basic understanding of compiling Java/Gradle
+projects.
+
 ### License
 
 Sodium is licensed under GNU LGPLv3, a free and open-source license. For more information, please see the

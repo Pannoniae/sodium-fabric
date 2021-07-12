@@ -4,15 +4,14 @@ import me.jellysquid.mods.sodium.client.model.light.LightMode;
 import me.jellysquid.mods.sodium.client.model.light.LightPipeline;
 import me.jellysquid.mods.sodium.client.model.light.LightPipelineProvider;
 import me.jellysquid.mods.sodium.client.model.light.data.QuadLightData;
-import me.jellysquid.mods.sodium.client.model.quad.ModelQuad;
 import me.jellysquid.mods.sodium.client.model.quad.ModelQuadView;
-import me.jellysquid.mods.sodium.client.model.quad.ModelQuadViewMutable;
 import me.jellysquid.mods.sodium.client.model.quad.blender.BiomeColorBlender;
 import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadOrientation;
-import me.jellysquid.mods.sodium.client.model.quad.sink.ModelQuadSinkDelegate;
+import me.jellysquid.mods.sodium.client.render.chunk.compile.buffers.ChunkModelBuffers;
+import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
+import me.jellysquid.mods.sodium.client.render.chunk.format.ModelVertexSink;
 import me.jellysquid.mods.sodium.client.render.occlusion.BlockOcclusionCache;
-import me.jellysquid.mods.sodium.client.util.ModelQuadUtil;
 import me.jellysquid.mods.sodium.client.util.color.ColorABGR;
 import me.jellysquid.mods.sodium.client.util.rand.XoRoShiRoRandom;
 import me.jellysquid.mods.sodium.client.world.biome.BlockColorsExtended;
@@ -22,13 +21,17 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.color.IBlockColor;
 import net.minecraft.client.renderer.model.BakedQuad;
 import net.minecraft.client.renderer.model.IBakedModel;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.util.Direction;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.vector.Vector3d;
 import net.minecraft.world.IBlockDisplayReader;
+import net.minecraftforge.client.model.ModelDataManager;
+import net.minecraftforge.client.model.data.EmptyModelData;
 import net.minecraftforge.client.model.data.IModelData;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 
 public class BlockRenderer {
@@ -37,7 +40,6 @@ public class BlockRenderer {
     private final BlockColorsExtended blockColors;
     private final BlockOcclusionCache occlusionCache;
 
-    private final ModelQuad cachedQuad = new ModelQuad();
     private final QuadLightData cachedQuadLightData = new QuadLightData();
 
     private final BiomeColorBlender biomeColorBlender;
@@ -55,9 +57,16 @@ public class BlockRenderer {
         this.useAmbientOcclusion = Minecraft.isAmbientOcclusionEnabled();
     }
 
-    public boolean renderModel(IBlockDisplayReader world, BlockState state, BlockPos pos, IBakedModel model, ModelQuadSinkDelegate builder, boolean cull, long seed, IModelData modelData) {
+    public boolean renderModel(IBlockDisplayReader world, BlockState state, BlockPos pos, IBakedModel model, ChunkModelBuffers buffers, boolean cull, long seed) {
         LightPipeline lighter = this.lighters.getLighter(this.getLightingMode(state, model));
         Vector3d offset = state.getOffset(world, pos);
+
+        // This is needed for Forge
+        IModelData modelData = ModelDataManager.getModelData(Objects.requireNonNull(Minecraft.getInstance().world), pos);
+        if (modelData == null) {
+            modelData = EmptyModelData.INSTANCE;
+        }
+
         modelData = model.getModelData(world, pos, state, modelData);
 
         boolean rendered = false;
@@ -72,7 +81,7 @@ public class BlockRenderer {
             }
 
             if (!cull || this.occlusionCache.shouldDrawSide(state, world, pos, dir)) {
-                this.renderQuadList(world, state, pos, lighter, offset, builder, sided, ModelQuadFacing.fromDirection(dir));
+                this.renderQuadList(world, state, pos, lighter, offset, buffers, sided, ModelQuadFacing.fromDirection(dir));
 
                 rendered = true;
             }
@@ -83,7 +92,7 @@ public class BlockRenderer {
         List<BakedQuad> all = model.getQuads(state, null, this.random, modelData);
 
         if (!all.isEmpty()) {
-            this.renderQuadList(world, state, pos, lighter, offset, builder, all, ModelQuadFacing.NONE);
+            this.renderQuadList(world, state, pos, lighter, offset, buffers, all, ModelQuadFacing.UNASSIGNED);
 
             rendered = true;
         }
@@ -92,14 +101,17 @@ public class BlockRenderer {
     }
 
     private void renderQuadList(IBlockDisplayReader world, BlockState state, BlockPos pos, LightPipeline lighter, Vector3d offset,
-                                ModelQuadSinkDelegate builder, List<BakedQuad> quads, ModelQuadFacing facing) {
-        IBlockColor colorizer = null;
+                                ChunkModelBuffers buffers, List<BakedQuad> quads, ModelQuadFacing facing) {
+            IBlockColor colorizer = null;
+
+        ModelVertexSink sink = buffers.getSink(facing);
+        sink.ensureCapacity(quads.size() * 4);
+
+        ChunkRenderData.Builder renderData = buffers.getRenderData();
 
         // This is a very hot allocation, iterate over it manually
         // noinspection ForLoopReplaceableByForEach
-        for (int i = 0, quadsSize = quads.size(); i < quadsSize; i++) {
-            BakedQuad quad = quads.get(i);
-
+        for (BakedQuad quad : quads) {
             QuadLightData light = this.cachedQuadLightData;
             lighter.calculate((ModelQuadView) quad, pos, light, quad.getFace(), quad.applyDiffuseLighting());
 
@@ -107,18 +119,18 @@ public class BlockRenderer {
                 colorizer = this.blockColors.getColorProvider(state);
             }
 
-            this.renderQuad(world, state, pos, builder, offset, colorizer, quad, light, facing);
+            this.renderQuad(world, state, pos, sink, offset, colorizer, quad, light, renderData);
         }
+
+        sink.flush();
     }
 
-    private void renderQuad(IBlockDisplayReader world, BlockState state, BlockPos pos, ModelQuadSinkDelegate consumer, Vector3d offset,
-                            IBlockColor colorProvider, BakedQuad bakedQuad, QuadLightData light, ModelQuadFacing facing) {
+    private void renderQuad(IBlockDisplayReader world, BlockState state, BlockPos pos, ModelVertexSink sink, Vector3d offset,
+                IBlockColor colorProvider, BakedQuad bakedQuad, QuadLightData light, ChunkRenderData.Builder renderData) {
         ModelQuadView src = (ModelQuadView) bakedQuad;
 
         ModelQuadOrientation order = ModelQuadOrientation.orient(light.br);
-        ModelQuadViewMutable copy = this.cachedQuad;
 
-        int norm = ModelQuadUtil.getFacingNormal(bakedQuad.getFace());
         int[] colors = null;
 
         if (bakedQuad.hasTintIndex()) {
@@ -128,19 +140,25 @@ public class BlockRenderer {
         for (int dstIndex = 0; dstIndex < 4; dstIndex++) {
             int srcIndex = order.getVertexIndex(dstIndex);
 
-            copy.setX(dstIndex, src.getX(srcIndex) + (float) offset.getX());
-            copy.setY(dstIndex, src.getY(srcIndex) + (float) offset.getY());
-            copy.setZ(dstIndex, src.getZ(srcIndex) + (float) offset.getZ());
-            copy.setColor(dstIndex, ColorABGR.mul(colors != null ? colors[srcIndex] : 0xFFFFFFFF, light.br[srcIndex]));
-            copy.setTexU(dstIndex, src.getTexU(srcIndex));
-            copy.setTexV(dstIndex, src.getTexV(srcIndex));
-            copy.setLight(dstIndex, light.lm[srcIndex]);
-            copy.setNormal(dstIndex, norm);
-            copy.setSprite(src.getSprite());
+            float x = src.getX(srcIndex) + (float) offset.getX();
+            float y = src.getY(srcIndex) + (float) offset.getY();
+            float z = src.getZ(srcIndex) + (float) offset.getZ();
+
+            int color = ColorABGR.mul(colors != null ? colors[srcIndex] : 0xFFFFFFFF, light.br[srcIndex]);
+
+            float u = src.getTexU(srcIndex);
+            float v = src.getTexV(srcIndex);
+
+            int lm = light.lm[srcIndex];
+
+            sink.writeQuad(x, y, z, color, u, v, lm);
         }
 
-        consumer.get(facing)
-                .write(copy);
+        TextureAtlasSprite sprite = src.getSprite();
+
+        if (sprite != null) {
+            renderData.addSprite(sprite);
+        }
     }
 
     private LightMode getLightingMode(BlockState state, IBakedModel model) {

@@ -2,8 +2,10 @@ package me.jellysquid.mods.sodium.mixin.features.item;
 
 import com.mojang.blaze3d.matrix.MatrixStack;
 import com.mojang.blaze3d.vertex.IVertexBuilder;
-import me.jellysquid.mods.sodium.client.model.consumer.QuadVertexConsumer;
 import me.jellysquid.mods.sodium.client.model.quad.ModelQuadView;
+import me.jellysquid.mods.sodium.client.model.vertex.VanillaVertexTypes;
+import me.jellysquid.mods.sodium.client.model.vertex.VertexDrain;
+import me.jellysquid.mods.sodium.client.model.vertex.formats.quad.QuadVertexSink;
 import me.jellysquid.mods.sodium.client.render.texture.SpriteUtil;
 import me.jellysquid.mods.sodium.client.util.ModelQuadUtil;
 import me.jellysquid.mods.sodium.client.util.color.ColorARGB;
@@ -60,11 +62,14 @@ public class MixinItemRenderer {
      * @author JellySquid
      */
     @Overwrite
-    public void renderQuads(MatrixStack matrices, IVertexBuilder vertices, List<BakedQuad> quads, ItemStack stack, int light, int overlay) {
+    public void renderQuads(MatrixStack matrices, IVertexBuilder vertexConsumer, List<BakedQuad> quads, ItemStack stack, int light, int overlay) {
         MatrixStack.Entry entry = matrices.getLast();
 
-        QuadVertexConsumer consumer = (QuadVertexConsumer) vertices;
         IItemColor colorProvider = null;
+
+        QuadVertexSink drain = VertexDrain.of(vertexConsumer)
+                .createSink(VanillaVertexTypes.QUADS);
+        drain.ensureCapacity(quads.size() * 4);
 
         for (BakedQuad bakedQuad : quads) {
             int color = 0xFFFFFFFF;
@@ -80,11 +85,13 @@ public class MixinItemRenderer {
             ModelQuadView quad = ((ModelQuadView) bakedQuad);
 
             for (int i = 0; i < 4; i++) {
-                consumer.vertexQuad(entry, quad.getX(i), quad.getY(i), quad.getZ(i), color, quad.getTexU(i), quad.getTexV(i),
+                drain.writeQuad(entry, quad.getX(i), quad.getY(i), quad.getZ(i), color, quad.getTexU(i), quad.getTexV(i),
                         light, overlay, ModelQuadUtil.getFacingNormal(bakedQuad.getFace()));
             }
 
             SpriteUtil.markSpriteActive(quad.getSprite());
         }
+
+        drain.flush();
     }
 }

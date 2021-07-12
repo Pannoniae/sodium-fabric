@@ -27,12 +27,16 @@ public class MixinItemColors implements ItemColorsExtended {
     @Inject(method = "register", at = @At("HEAD"))
     private void preRegisterColor(IItemColor mapper, IItemProvider[] convertibles, CallbackInfo ci) {
         for (IItemProvider convertible : convertibles) {
-            this.itemsToColor.put(convertible.asItem(), mapper);
+            synchronized (this) {
+                this.itemsToColor.put(convertible.asItem(), mapper);
+            }
         }
     }
 
     @Override
     public IItemColor getColorProvider(ItemStack stack) {
-        return this.itemsToColor.get(stack.getItem());
+        synchronized (this) {
+            return this.itemsToColor.get(stack.getItem());
+        }
     }
 }

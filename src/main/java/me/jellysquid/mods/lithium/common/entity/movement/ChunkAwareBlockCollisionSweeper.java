@@ -1,5 +1,6 @@
 package me.jellysquid.mods.lithium.common.entity.movement;
 
+import lombok.extern.log4j.Log4j2;
 import me.jellysquid.mods.lithium.common.entity.LithiumEntityCollisions;
 import me.jellysquid.mods.lithium.common.shapes.VoxelShapeCaster;
 import net.minecraft.block.BlockState;
@@ -22,6 +23,7 @@ import static me.jellysquid.mods.lithium.common.entity.LithiumEntityCollisions.E
  * ChunkAwareBlockCollisionSweeper iterates over blocks in one chunk section at a time. Together with the chunk
  * section keeping track of the amount of oversized blocks inside the number of iterations can often be reduced.
  */
+@Log4j2
 public class ChunkAwareBlockCollisionSweeper {
     private static final boolean OVERSIZED_BLOCK_COUNTING_ENABLED = OversizedBlocksCounter.class.isAssignableFrom(ChunkSection.class);
 
@@ -114,8 +116,9 @@ public class ChunkAwareBlockCollisionSweeper {
                     //Casting to Chunk is not checked, together with other mods this could cause a ClassCastException
                     try {
                         this.cachedChunk = (IChunk) this.view.getBlockReader(this.chunkX, this.chunkZ);
-                    } catch (Exception e) {
-                        
+                    } catch (ClassCastException ex) {
+                        log.debug("Could not cast to IChunk, skipping chunk cache check", ex);
+                        this.cachedChunk = null;
                     }
                     if (this.cachedChunk != null) {
                         this.cachedChunkSection = this.cachedChunk.getSections()[this.chunkY];

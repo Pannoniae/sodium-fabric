@@ -1,7 +1,7 @@
 package me.jellysquid.mods.sodium.mixin.features.block;
 
 import com.mojang.blaze3d.matrix.MatrixStack;
-import me.jellysquid.mods.sodium.client.render.pipeline.context.GlobalRenderContext;
+import me.jellysquid.mods.sodium.client.render.pipeline.context.ChunkRenderCacheShared;
 import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LightTexture;
@@ -22,6 +22,6 @@ public class MixinWorldRenderer {
     private void reset(MatrixStack matrices, float tickDelta, long limitTime, boolean renderBlockOutline, ActiveRenderInfo camera,
                        GameRenderer gameRenderer, LightTexture lightmapTextureManager, Matrix4f matrix4f,
                        CallbackInfo ci) {
-        GlobalRenderContext.reset();
+        ChunkRenderCacheShared.resetCaches();
     }
 }

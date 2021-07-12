@@ -62,8 +62,32 @@ public class ChunkRenderList<T> {
     /**
      * @return An iterator which returns elements in FIFO order or LIFO order if {@param backwards} is set
      */
-    public ChunkRenderListIterator<T> iterator(boolean forwards) {
-        if (forwards) {
+    public ChunkRenderListIterator<T> iterator(boolean backwards) {
+        if (backwards) {
+            return new ChunkRenderListIterator<T>() {
+                private int pos = ChunkRenderList.this.size - 1;
+
+                @Override
+                public T getGraphicsState() {
+                    return ChunkRenderList.this.stateArray[this.pos];
+                }
+
+                @Override
+                public int getVisibleFaces() {
+                    return ChunkRenderList.this.cullArray[this.pos];
+                }
+
+                @Override
+                public boolean hasNext() {
+                    return this.pos >= 0;
+                }
+
+                @Override
+                public void advance() {
+                    this.pos--;
+                }
+            };
+        } else {
             return new ChunkRenderListIterator<T>() {
                 private final int lim = ChunkRenderList.this.size;
 
@@ -87,30 +111,6 @@ public class ChunkRenderList<T> {
                 @Override
                 public void advance() {
                     this.pos++;
-                }
-            };
-        } else {
-            return new ChunkRenderListIterator<T>() {
-                private int pos = ChunkRenderList.this.size - 1;
-
-                @Override
-                public T getGraphicsState() {
-                    return ChunkRenderList.this.stateArray[this.pos];
-                }
-
-                @Override
-                public int getVisibleFaces() {
-                    return ChunkRenderList.this.cullArray[this.pos];
-                }
-
-                @Override
-                public boolean hasNext() {
-                    return this.pos >= 0;
-                }
-
-                @Override
-                public void advance() {
-                    this.pos--;
                 }
             };
         }

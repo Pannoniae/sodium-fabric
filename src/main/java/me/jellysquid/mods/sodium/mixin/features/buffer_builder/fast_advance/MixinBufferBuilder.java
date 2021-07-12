@@ -2,6 +2,7 @@ package me.jellysquid.mods.sodium.mixin.features.buffer_builder.fast_advance;
 
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.DefaultColorVertexBuilder;
+import com.mojang.blaze3d.vertex.IVertexConsumer;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.client.renderer.vertex.VertexFormatElement;
@@ -10,7 +11,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(BufferBuilder.class)
-public abstract class MixinBufferBuilder extends DefaultColorVertexBuilder {
+public abstract class MixinBufferBuilder extends DefaultColorVertexBuilder implements IVertexConsumer {
     @Shadow
     private VertexFormat vertexFormat;
 
@@ -27,6 +28,7 @@ public abstract class MixinBufferBuilder extends DefaultColorVertexBuilder {
      * @author JellySquid
      * @reason Remove modulo operations and recursion
      */
+    @Override
     @Overwrite
     public void nextVertexFormatIndex() {
         ImmutableList<VertexFormatElement> elements = this.vertexFormat.getElements();
@@ -43,7 +45,7 @@ public abstract class MixinBufferBuilder extends DefaultColorVertexBuilder {
         } while (this.vertexFormatElement.getUsage() == VertexFormatElement.Usage.PADDING);
 
         if (this.defaultColor && this.vertexFormatElement.getUsage() == VertexFormatElement.Usage.COLOR) {
-            this.color(this.defaultRed, this.defaultGreen, this.defaultBlue, this.defaultAlpha);
+            IVertexConsumer.super.color(this.defaultRed, this.defaultGreen, this.defaultBlue, this.defaultAlpha);
         }
     }
 }

@@ -1,5 +1,6 @@
 package me.jellysquid.mods.sodium.mixin.features.model;
 
+import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.renderer.model.BakedQuad;
 import net.minecraft.client.renderer.model.IBakedModel;
@@ -10,26 +11,17 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.*;
 import java.util.function.Predicate;
 
 @Mixin(MultipartBakedModel.class)
 public class MixinMultipartBakedModel {
-    private Map<BlockState, List<IBakedModel>> stateCacheFast;
+    private final Map<BlockState, List<IBakedModel>> stateCacheFast = new Reference2ReferenceOpenHashMap<>();
 
     @Shadow
     @Final
     private List<Pair<Predicate<BlockState>, IBakedModel>> selectors;
-
-
-    @Inject(method = "<init>", at = @At("RETURN"))
-    private void init(List<Pair<Predicate<BlockState>, IBakedModel>> components, CallbackInfo ci) {
-        this.stateCacheFast = new IdentityHashMap<>();
-    }
 
     /**
      * @author JellySquid
@@ -41,18 +33,24 @@ public class MixinMultipartBakedModel {
             return Collections.emptyList();
         }
 
-        List<IBakedModel> models = this.stateCacheFast.get(state);
+        List<IBakedModel> models;
 
-        if (models == null) {
-            models = new ArrayList<>(this.selectors.size());
+        // FIXME: Synchronization-hack because getQuads must be thread-safe
+        // Vanilla is actually affected by the exact same issue safety issue, but crashes seem rare in practice
+        synchronized (this.stateCacheFast) {
+            models = this.stateCacheFast.get(state);
 
-            for (Pair<Predicate<BlockState>, IBakedModel> pair : this.selectors) {
-                if ((pair.getLeft()).test(state)) {
-                    models.add(pair.getRight());
+            if (models == null) {
+                models = new ArrayList<>(this.selectors.size());
+
+                for (Pair<Predicate<BlockState>, IBakedModel> pair : this.selectors) {
+                    if ((pair.getLeft()).test(state)) {
+                        models.add(pair.getRight());
+                    }
                 }
-            }
 
-            this.stateCacheFast.put(state, models);
+                this.stateCacheFast.put(state, models);
+            }
         }
 
         List<BakedQuad> list = new ArrayList<>();

@@ -27,12 +27,16 @@ public class MixinBlockColors implements BlockColorsExtended {
     @Inject(method = "register", at = @At("HEAD"))
     private void preRegisterColor(IBlockColor provider, Block[] blocks, CallbackInfo ci) {
         for (Block block : blocks) {
-            this.blocksToColor.put(block, provider);
+            synchronized (this) {
+                this.blocksToColor.put(block, provider);
+            }
         }
     }
 
     @Override
     public IBlockColor getColorProvider(BlockState state) {
-        return this.blocksToColor.get(state.getBlock());
+        synchronized (this) {
+            return this.blocksToColor.get(state.getBlock());
+        }
     }
 }

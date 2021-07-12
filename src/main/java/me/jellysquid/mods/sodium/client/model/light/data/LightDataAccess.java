@@ -73,9 +73,11 @@ public abstract class LightDataAccess {
         // solve lighting issues underwater.
         boolean op = state.getFluidState() != EMPTY_FLUID_STATE || state.getOpacity(world, pos) == 0;
         boolean fo = state.isOpaqueCube(world, pos);
+        boolean em = state.isEmissiveRendering(world, pos);
 
-        // OPTIMIZE: Do not calculate lightmap data if the block is full and opaque
-        int lm = fo ? 0 : WorldRenderer.getPackedLightmapCoords(world, state, pos);
+        // OPTIMIZE: Do not calculate lightmap data if the block is full and opaque.
+        // FIX: Calculate lightmap data for emissive blocks (currently only magma), even though they are full and opaque.
+        int lm = (fo && !em) ? 0 : WorldRenderer.getPackedLightmapCoords(world, state, pos);
 
         return packAO(ao) | packLM(lm) | packOP(op) | packFO(fo) | (1L << 60);
     }
@@ -111,7 +113,7 @@ public abstract class LightDataAccess {
 
     public static float unpackAO(long word) {
         int aoi = (int) (word >>> 32 & 0xFFFFL);
-        return aoi / 4096.0f;
+        return aoi * (1.0f / 4096.0f);
     }
 
     public IBlockDisplayReader getWorld() {

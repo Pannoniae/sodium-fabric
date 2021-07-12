@@ -1,39 +1,49 @@
 package me.jellysquid.mods.sodium.client.render.chunk;
 
 import com.mojang.blaze3d.matrix.MatrixStack;
+import it.unimi.dsi.fastutil.ints.IntIterator;
+import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongCollection;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import lombok.Setter;
 import me.jellysquid.mods.sodium.client.SodiumClientMod;
-import me.jellysquid.mods.sodium.client.gl.util.GlFogHelper;
-import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import me.jellysquid.mods.sodium.client.gl.compat.LegacyFogHelper;
+import me.jellysquid.mods.sodium.client.gl.device.CommandList;
+import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
 import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuildResult;
 import me.jellysquid.mods.sodium.client.render.chunk.compile.ChunkBuilder;
+import me.jellysquid.mods.sodium.client.render.chunk.cull.ChunkCuller;
+import me.jellysquid.mods.sodium.client.render.chunk.cull.ChunkFaceFlags;
+import me.jellysquid.mods.sodium.client.render.chunk.cull.graph.ChunkGraphCuller;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderBounds;
 import me.jellysquid.mods.sodium.client.render.chunk.data.ChunkRenderData;
 import me.jellysquid.mods.sodium.client.render.chunk.lists.ChunkRenderList;
 import me.jellysquid.mods.sodium.client.render.chunk.lists.ChunkRenderListIterator;
 import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPass;
+import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
 import me.jellysquid.mods.sodium.client.util.math.FrustumExtended;
 import me.jellysquid.mods.sodium.client.world.ChunkStatusListener;
 import me.jellysquid.mods.sodium.common.util.DirectionUtil;
+import me.jellysquid.mods.sodium.common.util.IdTable;
+import me.jellysquid.mods.sodium.common.util.TranslucentPoolUtil;
 import me.jellysquid.mods.sodium.common.util.collections.FutureDequeDrain;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.Direction;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.SectionPos;
+import net.minecraft.util.math.vector.Matrix4f;
+import net.minecraft.util.math.vector.Vector3d;
 import net.minecraft.world.chunk.ChunkSection;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.Collection;
+import java.util.Deque;
 import java.util.concurrent.CompletableFuture;
 
 public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkStatusListener {
@@ -54,127 +64,153 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
      * back far enough. I'm sure there's a mathematical formula that should be used here in place of the constant,
      * but this value works fine in testing.
      */
-    private static final float FOG_PLANE_OFFSET = 5.0f;
+    private static final float FOG_PLANE_OFFSET = 12.0f;
 
     private final ChunkBuilder<T> builder;
     private final ChunkRenderBackend<T> backend;
 
-    private final Long2ObjectOpenHashMap<ChunkRenderContainer<T>> renders = new Long2ObjectOpenHashMap<>();
+    private final Long2ObjectOpenHashMap<ChunkRenderColumn<T>> columns = new Long2ObjectOpenHashMap<>();
+    private final IdTable<ChunkRenderContainer<T>> renders = new IdTable<>(16384);
 
-    private final ObjectArrayFIFOQueue<ChunkRenderContainer<T>> iterationQueue = new ObjectArrayFIFOQueue<>();
     private final ObjectArrayFIFOQueue<ChunkRenderContainer<T>> importantRebuildQueue = new ObjectArrayFIFOQueue<>();
     private final ObjectArrayFIFOQueue<ChunkRenderContainer<T>> rebuildQueue = new ObjectArrayFIFOQueue<>();
+    private final ObjectArrayFIFOQueue<ChunkRenderContainer<T>> unloadQueue = new ObjectArrayFIFOQueue<>();
 
     @SuppressWarnings("unchecked")
-    private final ChunkRenderList<T>[] chunkRenderLists;
-
+    private final ChunkRenderList<T>[] chunkRenderLists = new ChunkRenderList[BlockRenderPass.COUNT];
     private final ObjectList<ChunkRenderContainer<T>> tickableChunks = new ObjectArrayList<>();
+
     private final ObjectList<TileEntity> visibleBlockEntities = new ObjectArrayList<>();
 
     private final SodiumWorldRenderer renderer;
     private final ClientWorld world;
 
-    private final int renderDistance;
+    private final ChunkCuller culler;
+    private final boolean useBlockFaceCulling;
 
-    private int lastFrameUpdated;
-    private double fogRenderCutoff;
-    private boolean useOcclusionCulling, useFogCulling;
+    private float cameraX, cameraY, cameraZ;
     private boolean dirty;
 
-    private double cameraX, cameraY, cameraZ;
-    private boolean useAggressiveCulling;
+    @Setter
+    private boolean cameraPosChanged;
+
+    private final boolean translucencySorting;
 
     private int visibleChunkCount;
 
+    private boolean useFogCulling;
+    private double fogRenderCutoff;
+
+    private final int translucencyBlockRenderDistance;
+
+    @Setter
+    private Matrix4f projection;
+
+    private FrustumExtended currFrustum;
+
     @SuppressWarnings("unchecked")
-    public ChunkRenderManager(SodiumWorldRenderer renderer, ChunkRenderBackend<T> backend, ClientWorld world, int renderDistance) {
+    public ChunkRenderManager(SodiumWorldRenderer renderer, ChunkRenderBackend<T> backend, BlockRenderPassManager renderPassManager,
+                              ClientWorld world, int renderDistance) {
         this.backend = backend;
         this.renderer = renderer;
         this.world = world;
-        this.renderDistance = renderDistance;
 
-        this.builder = new ChunkBuilder<>(backend.getVertexFormat(), this.backend);
-        this.builder.init(world);
+        this.builder = new ChunkBuilder<>(backend.getVertexType(), this.backend);
+        this.builder.init(world, renderPassManager);
 
         this.dirty = true;
-
-        this.chunkRenderLists = new ChunkRenderList[backend.getRenderPassManager().getPassCount()];
 
         for (int i = 0; i < this.chunkRenderLists.length; i++) {
             this.chunkRenderLists[i] = new ChunkRenderList<>();
         }
+
+        this.culler = new ChunkGraphCuller(world, renderDistance);
+        this.translucencySorting = SodiumClientMod.options().advanced.translucencySorting;
+        this.translucencyBlockRenderDistance = Math.min(9216, (renderDistance << 4) * (renderDistance << 4));
+
+        TranslucentPoolUtil.resetTranslucentRebuilds();
+        this.useBlockFaceCulling = SodiumClientMod.options().advanced.useBlockFaceCulling;
     }
 
-    public void updateGraph(ActiveRenderInfo camera, FrustumExtended frustum, int frame, boolean spectator) {
-        this.init(camera, frustum, frame, spectator);
+    public void update(ActiveRenderInfo camera, FrustumExtended frustum, int frame, boolean spectator) {
+        this.reset();
+        this.unloadPending();
 
-        ObjectArrayFIFOQueue<ChunkRenderContainer<T>> queue = this.iterationQueue;
+        this.setup(camera);
 
-        while (!queue.isEmpty()) {
-            ChunkRenderContainer<T> render = queue.dequeue();
+        this.currFrustum = frustum;
 
-            if (render.needsRebuild() && render.canRebuild()) {
-                if (render.needsImportantRebuild()) {
-                    this.importantRebuildQueue.enqueue(render);
-                } else {
-                    this.rebuildQueue.enqueue(render);
-                }
-            }
-
-            if (!render.isEmpty()) {
-                this.addChunkToRenderLists(render);
-
-                Collection<TileEntity> blockEntities = render.getData().getBlockEntities();
-
-                if (!blockEntities.isEmpty()) {
-                    this.visibleBlockEntities.addAll(blockEntities);
-                }
-            }
-
-            for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
-                if (!render.canCull(dir)) {
-                    this.addChunkNeighbor(render, frustum, dir, frame);
-                }
-            }
-        }
+        this.iterateChunks(camera, frustum, frame, spectator);
 
         this.dirty = false;
     }
 
-    private void addChunkNeighbor(ChunkRenderContainer<T> parent, FrustumExtended frustum, Direction dir, int frame) {
-        ChunkRenderContainer<T> adj = parent.getAdjacentRender(dir);
+    private void iterateChunks(ActiveRenderInfo camera, FrustumExtended frustum, int frame, boolean spectator) {
+        IntList list = this.culler.computeVisible(camera, frustum, frame, spectator);
+        IntIterator it = list.iterator();
 
-        if (adj == null || adj.getLastVisibleFrame() == frame) {
-            return;
+        int translucentBudget = Math.max(1, builder.getSchedulingBudget()/4);
+
+        while (it.hasNext()) {
+            ChunkRenderContainer<T> render = this.renders.get(it.nextInt());
+
+            this.addChunk(render, translucentBudget);
+        }
+    }
+
+    private void addChunk(ChunkRenderContainer<T> render, int translucentBudget) {
+        boolean rebuild = render.needsRebuild() && render.canRebuild();
+
+        if (!rebuild && this.translucencySorting && render.shouldRebuildForTranslucents() && this.cameraPosChanged
+                && TranslucentPoolUtil.getTranslucentRebuilds() <= translucentBudget
+                && !render.isOutsideFrustum(this.currFrustum)
+                && render.getSquaredDistance(cameraX, cameraY, cameraZ) < translucencyBlockRenderDistance) {
+            TranslucentPoolUtil.incrementTranslucentRebuilds();
+            rebuild = true;
         }
 
-        if (this.useOcclusionCulling) {
-            Direction flow = parent.getDirection();
-
-            if (flow != null && !parent.isVisibleThrough(flow, dir)) {
-                return;
+        if (rebuild) {
+            if (render.needsImportantRebuild()) {
+                this.importantRebuildQueue.enqueue(render);
+            } else {
+                this.rebuildQueue.enqueue(render);
             }
         }
 
-        if (this.useFogCulling && parent.getSquaredDistanceXZ(this.cameraX, this.cameraZ) >= this.fogRenderCutoff) {
+        if (this.useFogCulling && render.getSquaredDistanceXZ(this.cameraX, this.cameraZ) >= this.fogRenderCutoff) {
             return;
         }
 
-        if (adj.isOutsideFrustum(frustum)) {
-            return;
+        if (!render.isEmpty()) {
+            this.addChunkToRenderLists(render);
+            this.addEntitiesToRenderLists(render);
         }
+    }
 
-        Direction flow = dir.getOpposite();
+    private void setup(ActiveRenderInfo camera) {
+        Vector3d cameraPos = camera.getProjectedView();
 
-        adj.setDirection(flow);
-        adj.setVisibleFrame(frame);
-        adj.setCullingState(parent.getCullingState(), flow);
+        this.cameraX = (float) cameraPos.x;
+        this.cameraY = (float) cameraPos.y;
+        this.cameraZ = (float) cameraPos.z;
 
-        this.iterationQueue.enqueue(adj);
+        this.useFogCulling = false;
+
+        if (SodiumClientMod.options().advanced.useFogOcclusion) {
+            float dist = LegacyFogHelper.getFogCutoff() + FOG_PLANE_OFFSET;
+
+            if (dist != 0.0f) {
+                this.useFogCulling = true;
+                this.fogRenderCutoff = Math.max(FOG_PLANE_MIN_DISTANCE, dist * dist);
+            }
+        }
     }
 
     private void addChunkToRenderLists(ChunkRenderContainer<T> render) {
-        int visibleFaces = this.computeVisibleFaces(render) & render.getFacesWithData();
+        // Show all faces if we're doing translucency sorting, otherwise some faces will disappear and flicker around
+        int visibleFaces = ((this.translucencySorting && render.shouldRebuildForTranslucents()) ? ChunkFaceFlags.ALL
+                : this.computeVisibleFaces(render))
+                    & render.getFacesWithData();
 
         if (visibleFaces == 0) {
             return;
@@ -204,117 +240,62 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
     }
 
     private int computeVisibleFaces(ChunkRenderContainer<T> render) {
-        int visibleFaces;
+        // If chunk face culling is disabled, render all faces
+        if (!this.useBlockFaceCulling) {
+            return ChunkFaceFlags.ALL;
+        }
 
-        if (this.useAggressiveCulling) {
-            // Always render groups of vertices not belonging to any given face
-            visibleFaces = 1 << ModelQuadFacing.NONE.ordinal();
+        ChunkRenderBounds bounds = render.getBounds();
 
-            ChunkRenderBounds bounds = render.getBounds();
+        // Always render groups of vertices not belonging to any given face
+        int visibleFaces = ChunkFaceFlags.UNASSIGNED;
 
-            if (bounds != null) {
-                if (this.cameraY > bounds.y1) {
-                    visibleFaces |= 1 << ModelQuadFacing.UP.ordinal();
-                }
+        if (this.cameraY > bounds.y1) {
+            visibleFaces |= ChunkFaceFlags.UP;
+        }
 
-                if (this.cameraY < bounds.y2) {
-                    visibleFaces |= 1 << ModelQuadFacing.DOWN.ordinal();
-                }
+        if (this.cameraY < bounds.y2) {
+            visibleFaces |= ChunkFaceFlags.DOWN;
+        }
 
-                if (this.cameraX > bounds.x1) {
-                    visibleFaces |= 1 << ModelQuadFacing.EAST.ordinal();
-                }
+        if (this.cameraX > bounds.x1) {
+            visibleFaces |= ChunkFaceFlags.EAST;
+        }
 
-                if (this.cameraX < bounds.x2) {
-                    visibleFaces |= 1 << ModelQuadFacing.WEST.ordinal();
-                }
+        if (this.cameraX < bounds.x2) {
+            visibleFaces |= ChunkFaceFlags.WEST;
+        }
 
-                if (this.cameraZ > bounds.z1) {
-                    visibleFaces |= 1 << ModelQuadFacing.SOUTH.ordinal();
-                }
+        if (this.cameraZ > bounds.z1) {
+            visibleFaces |= ChunkFaceFlags.SOUTH;
+        }
 
-                if (this.cameraZ < bounds.z2) {
-                    visibleFaces |= 1 << ModelQuadFacing.NORTH.ordinal();
-                }
-            }
-        } else {
-            visibleFaces = 0b1111111;
+        if (this.cameraZ < bounds.z2) {
+            visibleFaces |= ChunkFaceFlags.NORTH;
         }
 
         return visibleFaces;
     }
 
-    private void init(ActiveRenderInfo camera, FrustumExtended frustum, int frame, boolean spectator) {
-        this.cameraX = camera.getProjectedView().x;
-        this.cameraY = camera.getProjectedView().y;
-        this.cameraZ = camera.getProjectedView().z;
+    private void addEntitiesToRenderLists(ChunkRenderContainer<T> render) {
+        Collection<TileEntity> blockEntities = render.getData().getBlockEntities();
 
-        this.lastFrameUpdated = frame;
-        this.useOcclusionCulling = Minecraft.getInstance().renderChunksMany;
-        this.useAggressiveCulling = SodiumClientMod.options().advanced.useChunkFaceCulling;
-
-        this.resetGraph();
-
-        BlockPos origin = camera.getBlockPos();
-        int chunkX = origin.getX() >> 4;
-        int chunkY = origin.getY() >> 4;
-        int chunkZ = origin.getZ() >> 4;
-
-        ChunkRenderContainer<T> node = this.getRender(chunkX, chunkY, chunkZ);
-
-        if (node != null) {
-            node.resetGraphState();
-            node.setVisibleFrame(frame);
-
-            if (spectator && this.world.getBlockState(origin).isOpaqueCube(this.world, origin)) {
-                this.useOcclusionCulling = false;
-            }
-
-            this.iterationQueue.enqueue(node);
-        } else {
-            chunkY = MathHelper.clamp(origin.getY() >> 4, 0, 15);
-
-            List<ChunkRenderContainer<T>> list = new ArrayList<>();
-
-            for (int x2 = -this.renderDistance; x2 <= this.renderDistance; ++x2) {
-                for (int z2 = -this.renderDistance; z2 <= this.renderDistance; ++z2) {
-                    ChunkRenderContainer<T> chunk = this.getRender(chunkX + x2, chunkY, chunkZ + z2);
-
-                    if (chunk == null || chunk.isOutsideFrustum(frustum)) {
-                        continue;
-                    }
-
-                    chunk.setVisibleFrame(frame);
-                    chunk.resetGraphState();
-
-                    list.add(chunk);
-                }
-            }
-
-            list.sort(Comparator.comparingDouble(o -> o.getSquaredDistance(origin)));
-
-            for (ChunkRenderContainer<T> render : list) {
-                this.iterationQueue.enqueue(render);
-            }
-        }
-
-        this.useFogCulling = false;
-
-        if (GlFogHelper.isFogEnabled() && SodiumClientMod.options().advanced.useFogOcclusion) {
-            float dist = GlFogHelper.getFogCutoff() + FOG_PLANE_OFFSET;
-
-            if (dist != 0.0f) {
-                this.useFogCulling = true;
-                this.fogRenderCutoff = Math.max(FOG_PLANE_MIN_DISTANCE, dist * dist);
-            }
+        if (!blockEntities.isEmpty()) {
+            this.visibleBlockEntities.addAll(blockEntities);
         }
     }
 
     public ChunkRenderContainer<T> getRender(int x, int y, int z) {
-        return this.renders.get(SectionPos.asLong(x, y, z));
+        ChunkRenderColumn<T> column = this.columns.get(ChunkPos.asLong(x, z));
+
+        if (column == null) {
+            return null;
+        }
+
+        return column.getRender(y);
     }
 
-    private void resetGraph() {
+    private void reset() {
         this.rebuildQueue.clear();
         this.importantRebuildQueue.clear();
 
@@ -325,7 +306,15 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
         }
 
         this.tickableChunks.clear();
+
         this.visibleChunkCount = 0;
+    }
+
+    private void unloadPending() {
+        while (!this.unloadQueue.isEmpty()) {
+            this.unloadQueue.dequeue()
+                    .delete();
+        }
     }
 
     public Collection<TileEntity> getVisibleBlockEntities() {
@@ -334,62 +323,103 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
 
     @Override
     public void onChunkAdded(int x, int z) {
-        this.builder.onChunkStatusChanged(x, z);
         this.loadChunk(x, z);
     }
 
     @Override
     public void onChunkRemoved(int x, int z) {
-        this.builder.onChunkStatusChanged(x, z);
         this.unloadChunk(x, z);
     }
 
     private void loadChunk(int x, int z) {
-        for (int y = 0; y < 16; y++) {
-            ChunkRenderContainer<T> render = this.renders.computeIfAbsent(SectionPos.asLong(x, y, z), this::createChunkRender);
+        ChunkRenderColumn<T> column = new ChunkRenderColumn<>(x, z);
+        ChunkRenderColumn<T> prev;
 
-            for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
-                ChunkRenderContainer<T> adj = this.getRender(x + dir.getXOffset(), y + dir.getYOffset(), z + dir.getZOffset());
-
-                if (adj != null) {
-                    render.setAdjacentRender(dir, adj);
-                    adj.setAdjacentRender(dir.getOpposite(), render);
-                }
-            }
+        if ((prev = this.columns.put(ChunkPos.asLong(x, z), column)) != null) {
+            this.unloadSections(prev);
         }
+
+        this.connectNeighborColumns(column);
+        this.loadSections(column);
 
         this.dirty = true;
     }
 
     private void unloadChunk(int x, int z) {
-        for (int y = 0; y < 16; y++) {
-            ChunkRenderContainer<T> render = this.renders.remove(SectionPos.asLong(x, y, z));
+        ChunkRenderColumn<T> column = this.columns.remove(ChunkPos.asLong(x, z));
 
-            if (render == null) {
-                continue;
-            }
-
-            for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
-                ChunkRenderContainer<T> adj = render.getAdjacentRender(dir);
-
-                if (adj != null) {
-                    render.setAdjacentRender(dir, adj);
-                    adj.setAdjacentRender(dir.getOpposite(), null);
-                }
-            }
-
-            render.delete();
+        if (column == null) {
+            return;
         }
+
+        this.disconnectNeighborColumns(column);
+        this.unloadSections(column);
 
         this.dirty = true;
     }
 
-    private ChunkRenderContainer<T> createChunkRender(long pos) {
-        int x = SectionPos.extractX(pos);
-        int y = SectionPos.extractY(pos);
-        int z = SectionPos.extractZ(pos);
+    private void loadSections(ChunkRenderColumn<T> column) {
+        int x = column.getX();
+        int z = column.getZ();
 
-        ChunkRenderContainer<T> render = new ChunkRenderContainer<>(this.backend, this.renderer, x, y, z);
+        for (int y = 0; y < 16; y++) {
+            ChunkRenderContainer<T> render = this.createChunkRender(column, x, y, z);
+            column.setRender(y, render);
+
+            this.culler.onSectionLoaded(x, y, z, render.getId());
+        }
+    }
+
+    private void unloadSections(ChunkRenderColumn<T> column) {
+        int x = column.getX();
+        int z = column.getZ();
+
+        for (int y = 0; y < 16; y++) {
+            ChunkRenderContainer<T> render = column.getRender(y);
+
+            if (render != null) {
+                this.unloadQueue.enqueue(render);
+                this.renders.remove(render.getId());
+            }
+
+            this.culler.onSectionUnloaded(x, y, z);
+        }
+    }
+
+    private void connectNeighborColumns(ChunkRenderColumn<T> column) {
+        for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
+            ChunkRenderColumn<T> adj = this.getAdjacentColumn(column, dir);
+
+            if (adj != null) {
+                adj.setAdjacentColumn(dir.getOpposite(), column);
+            }
+
+            column.setAdjacentColumn(dir, adj);
+        }
+    }
+
+    private void disconnectNeighborColumns(ChunkRenderColumn<T> column) {
+        for (Direction dir : DirectionUtil.ALL_DIRECTIONS) {
+            ChunkRenderColumn<T> adj = column.getAdjacentColumn(dir);
+
+            if (adj != null) {
+                adj.setAdjacentColumn(dir.getOpposite(), null);
+            }
+
+            column.setAdjacentColumn(dir, null);
+        }
+    }
+
+    private ChunkRenderColumn<T> getAdjacentColumn(ChunkRenderColumn<T> column, Direction dir) {
+        return this.getColumn(column.getX() + dir.getXOffset(), column.getZ() + dir.getZOffset());
+    }
+
+    private ChunkRenderColumn<T> getColumn(int x, int z) {
+        return this.columns.get(ChunkPos.asLong(x, z));
+    }
+
+    private ChunkRenderContainer<T> createChunkRender(ChunkRenderColumn<T> column, int x, int y, int z) {
+        ChunkRenderContainer<T> render = new ChunkRenderContainer<>(this.backend, this.renderer, x, y, z, column);
 
         if (ChunkSection.isEmpty(this.world.getChunk(x, z).getSections()[y])) {
             render.setData(ChunkRenderData.EMPTY);
@@ -397,14 +427,23 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
             render.scheduleRebuild(false);
         }
 
+        render.setId(this.renders.add(render));
+
         return render;
     }
 
-    public void renderChunks(MatrixStack matrixStack, BlockRenderPass pass, double x, double y, double z) {
-        ChunkRenderListIterator<T> iterator = this.chunkRenderLists[pass.ordinal()]
-                .iterator(pass.isForwardRendering());
+    public void renderLayer(MatrixStack matrixStack, BlockRenderPass pass, double x, double y, double z) {
+        ChunkRenderList<T> chunkRenderList = this.chunkRenderLists[pass.ordinal()];
+        ChunkRenderListIterator<T> iterator = chunkRenderList.iterator(pass.isTranslucent());
 
-        this.backend.renderChunks(matrixStack, pass, iterator, new ChunkCameraContext(x, y, z));
+        RenderDevice device = RenderDevice.INSTANCE;
+        CommandList commandList = device.createCommandList();
+
+        this.backend.begin(matrixStack, projection);
+        this.backend.render(commandList, iterator, new ChunkCameraContext(x, y, z));
+        this.backend.end(matrixStack);
+
+        commandList.flush();
     }
 
     public void tickVisibleRenders() {
@@ -414,9 +453,7 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
     }
 
     public boolean isChunkVisible(int x, int y, int z) {
-        ChunkRenderContainer<T> render = this.getRender(x, y, z);
-
-        return render != null && render.getLastVisibleFrame() == this.lastFrameUpdated;
+        return this.culler.isSectionVisible(x, y, z);
     }
 
     public void updateChunks() {
@@ -452,12 +489,16 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
         this.dirty |= this.builder.performPendingUploads();
 
         if (!futures.isEmpty()) {
-            this.backend.uploadChunks(new FutureDequeDrain<>(futures));
+            this.backend.upload(RenderDevice.INSTANCE.createCommandList(), new FutureDequeDrain<>(futures));
         }
     }
 
     public void markDirty() {
         this.dirty = true;
+    }
+
+    public void markCameraPosChanged() {
+        this.cameraPosChanged = true;
     }
 
     public boolean isDirty() {
@@ -483,19 +524,19 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
     }
 
     public void destroy() {
-        this.resetGraph();
+        this.reset();
 
-        for (ChunkRenderContainer<T> render : this.renders.values()) {
-            render.delete();
+        for (ChunkRenderColumn<T> column : this.columns.values()) {
+            this.unloadSections(column);
         }
 
-        this.renders.clear();
+        this.columns.clear();
 
         this.builder.stopWorkers();
     }
 
     public int getTotalSections() {
-        return this.renders.size();
+        return this.columns.size() * 16;
     }
 
     public void scheduleRebuild(int x, int y, int z, boolean important) {
@@ -505,14 +546,22 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
             // Nearby chunks are always rendered immediately
             important = important || this.isChunkPrioritized(render);
 
-            // Only enqueue chunks for updates during the next frame if it is visible and wasn't already dirty
-            if (render.scheduleRebuild(important) && render.getLastVisibleFrame() == this.lastFrameUpdated) {
+            // Only enqueue chunks for updates if they aren't already enqueued for an update
+            //
+            // We should avoid rebuilding chunks that aren't visible by using data from the occlusion culler, however
+            // that is not currently feasible because occlusion culling data is only ever updated when chunks are
+            // rebuilt. Computation of occlusion data needs to be isolated from chunk rebuilds for that to be feasible.
+            //
+            // TODO: Avoid rebuilding chunks that aren't visible to the player
+            if (render.scheduleRebuild(important)) {
                 (render.needsImportantRebuild() ? this.importantRebuildQueue : this.rebuildQueue)
                         .enqueue(render);
             }
 
             this.dirty = true;
         }
+
+        this.builder.onChunkDataChanged(x, y, z);
     }
 
     public boolean isChunkPrioritized(ChunkRenderContainer<T> render) {
@@ -521,5 +570,9 @@ public class ChunkRenderManager<T extends ChunkGraphicsState> implements ChunkSt
 
     public int getVisibleChunkCount() {
         return this.visibleChunkCount;
+    }
+
+    public void onChunkRenderUpdates(int x, int y, int z, ChunkRenderData data) {
+        this.culler.onSectionStateChanged(x, y, z, data.getOcclusionData());
     }
 }

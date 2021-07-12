@@ -1,5 +1,6 @@
 package me.jellysquid.mods.sodium.common.config;
 
+import lombok.extern.log4j.Log4j2;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -12,10 +13,14 @@ import java.util.Properties;
  * Documentation of these options: https://github.com/jellysquid3/sodium-fabric/wiki/Configuration-File
  */
 @SuppressWarnings("CanBeFinal")
+@Log4j2
 public class SodiumConfig {
     private static final Logger LOGGER = LogManager.getLogger("SodiumConfig");
 
     private static final String JSON_KEY_SODIUM_OPTIONS = "sodium:options";
+    private static final String DISABLE_LITHIUM_COMMENT_1 = "# Comment out or remove the below line to enable Lithium\n";
+    private static final String DISABLE_LITHIUM_COMMENT_2 = "# Lithium pathfinding conflicts with some mods such as More Villagers\n";
+    private static final String DISABLE_LITHIUM_OPTION_TRIMMED = "mixin.ai=";
 
     private final Map<String, Option> options = new HashMap<>();
 
@@ -114,6 +119,7 @@ public class SodiumConfig {
         this.addMixinRule("features.entity.fast_render", true);
         this.addMixinRule("features.entity.smooth_lighting", true);
         this.addMixinRule("features.gui", true);
+        this.addMixinRule("features.gui.fast_loading_screen", true);
         this.addMixinRule("features.gui.font", true);
         this.addMixinRule("features.item", true);
         this.addMixinRule("features.matrix_stack", true);
@@ -265,7 +271,28 @@ public class SodiumConfig {
         Properties props = new Properties();
 
         try (FileInputStream fin = new FileInputStream(file)){
-            props.load(fin);
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fin));
+            String line;
+            boolean hasLithiumConfigured = false;
+            while ((line = bufferedReader.readLine()) != null) {
+                if (!hasLithiumConfigured && !line.trim().startsWith("#") && line.contains(DISABLE_LITHIUM_OPTION_TRIMMED)) {
+                    hasLithiumConfigured = true;
+                }
+            }
+
+            if (!hasLithiumConfigured) {
+                log.info("Disabling Lithium by default in Sodium Reforged");
+                FileWriter fileWriter = new FileWriter(file, true);
+                fileWriter.write("#\n");
+                fileWriter.write(DISABLE_LITHIUM_COMMENT_1);
+                fileWriter.write(DISABLE_LITHIUM_COMMENT_2);
+                fileWriter.write(DISABLE_LITHIUM_OPTION_TRIMMED + "false\n");
+                fileWriter.flush();
+                fileWriter.close();
+            }
+
+            FileInputStream fin2 = new FileInputStream(file);
+            props.load(fin2);
         } catch (IOException e) {
             throw new RuntimeException("Could not load config file", e);
         }
@@ -298,6 +325,10 @@ public class SodiumConfig {
             writer.write("#\n");
             writer.write("# Uncomment below line for vanilla seed gen parity\n");
             writer.write("# mixin.gen.fast_layer_sampling=false\n");
+            writer.write("#\n");
+            writer.write(DISABLE_LITHIUM_COMMENT_1);
+            writer.write(DISABLE_LITHIUM_COMMENT_2);
+            writer.write("mixin.ai=false\n");
         }
     }
 

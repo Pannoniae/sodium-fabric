@@ -9,7 +9,7 @@ public enum ModelQuadFacing {
     WEST,
     SOUTH,
     NORTH,
-    NONE;
+    UNASSIGNED;
 
     public static final ModelQuadFacing[] VALUES = ModelQuadFacing.values();
     public static final int COUNT = VALUES.length;
@@ -29,7 +29,26 @@ public enum ModelQuadFacing {
             case EAST:
                 return EAST;
             default:
-                return NONE;
+                return UNASSIGNED;
+        }
+    }
+
+    public ModelQuadFacing getOpposite() {
+        switch (this) {
+            case UP:
+                return DOWN;
+            case DOWN:
+                return UP;
+            case EAST:
+                return WEST;
+            case WEST:
+                return EAST;
+            case SOUTH:
+                return NORTH;
+            case NORTH:
+                return SOUTH;
+            default:
+                return UNASSIGNED;
         }
     }
 }

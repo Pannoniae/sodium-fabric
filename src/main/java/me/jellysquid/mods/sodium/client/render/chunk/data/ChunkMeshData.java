@@ -1,14 +1,16 @@
 package me.jellysquid.mods.sodium.client.render.chunk.data;
 
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import me.jellysquid.mods.sodium.client.gl.buffer.VertexData;
 import me.jellysquid.mods.sodium.client.gl.util.BufferSlice;
 import me.jellysquid.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 
+import java.util.EnumMap;
 import java.util.Map;
 
 public class ChunkMeshData {
-    private final Map<ModelQuadFacing, BufferSlice> parts = new Object2ObjectLinkedOpenHashMap<>();
+    public static final ChunkMeshData EMPTY = new ChunkMeshData();
+
+    private final EnumMap<ModelQuadFacing, BufferSlice> parts = new EnumMap<>(ModelQuadFacing.class);
     private VertexData vertexData;
 
     public void setVertexData(VertexData vertexData) {
@@ -29,6 +31,10 @@ public class ChunkMeshData {
         this.vertexData = null;
 
         return data;
+    }
+
+    public boolean hasVertexData() {
+        return this.vertexData != null;
     }
 
     public int getVertexDataSize() {

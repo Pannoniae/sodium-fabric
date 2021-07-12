@@ -1,7 +1,6 @@
 package me.jellysquid.mods.sodium.client.gui;
 
 import com.google.common.collect.ImmutableList;
-import me.jellysquid.mods.sodium.client.SodiumClientMod;
 import me.jellysquid.mods.sodium.client.gui.options.*;
 import me.jellysquid.mods.sodium.client.gui.options.binding.compat.VanillaBooleanOptionBinding;
 import me.jellysquid.mods.sodium.client.gui.options.control.ControlValueFormatter;
@@ -10,6 +9,7 @@ import me.jellysquid.mods.sodium.client.gui.options.control.SliderControl;
 import me.jellysquid.mods.sodium.client.gui.options.control.TickBoxControl;
 import me.jellysquid.mods.sodium.client.gui.options.storage.MinecraftOptionsStorage;
 import me.jellysquid.mods.sodium.client.gui.options.storage.SodiumOptionsStorage;
+import me.jellysquid.mods.sodium.client.render.chunk.backends.multidraw.MultidrawChunkRenderBackend;
 import me.jellysquid.mods.sodium.client.util.UnsafeUtil;
 import net.minecraft.client.AbstractOption;
 import net.minecraft.client.MainWindow;
@@ -231,28 +231,35 @@ public class SodiumGameOptionPages {
     }
 
     public static OptionPage advanced() {
-        boolean disableBlacklist = SodiumClientMod.options().advanced.disableDriverBlacklist;
-
         List<OptionGroup> groups = new ArrayList<>();
 
         groups.add(OptionGroup.createBuilder()
-                .add(OptionImpl.createBuilder(SodiumGameOptions.ChunkRendererBackendOption.class, sodiumOpts)
+                .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
                         .setName(I18n.format("sodium.options.chunk_renderer.name"))
                         .setTooltip(I18n.format("sodium.options.chunk_renderer.tooltip"))
-                        .setControl((opt) -> new CyclingControl<>(opt, SodiumGameOptions.ChunkRendererBackendOption.class,
-                                SodiumGameOptions.ChunkRendererBackendOption.getAvailableOptions(disableBlacklist)))
-                        .setBinding((opts, value) -> opts.advanced.chunkRendererBackend = value, opts -> opts.advanced.chunkRendererBackend)
+                        .setControl(TickBoxControl::new)
+                        .setBinding((opts, value) -> opts.advanced.useChunkMultidraw = value, opts -> opts.advanced.useChunkMultidraw)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
+                        .setImpact(OptionImpact.EXTREME)
+                        .setEnabled(MultidrawChunkRenderBackend.isSupported(sodiumOpts.getData().advanced.ignoreDriverBlacklist))
+                        .build())
+                .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
+                        .setName(I18n.format("sodium.options.use_vertex_array_objects.name"))
+                        .setTooltip(I18n.format("sodium.options.use_vertex_array_objects.tooltip"))
+                        .setControl(TickBoxControl::new)
+                        .setBinding((opts, value) -> opts.advanced.useVertexArrayObjects = value, opts -> opts.advanced.useVertexArrayObjects)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
+                        .setImpact(OptionImpact.LOW)
                         .build())
                 .build());
 
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
-                        .setName(I18n.format("sodium.options.use_chunk_face_culling.name"))
-                        .setTooltip(I18n.format("sodium.options.use_chunk_face_culling.tooltip"))
+                        .setName(I18n.format("sodium.options.use_block_face_culling.name"))
+                        .setTooltip(I18n.format("sodium.options.use_block_face_culling.tooltip"))
                         .setControl(TickBoxControl::new)
-                        .setBinding((opts, value) -> opts.advanced.useChunkFaceCulling = value, opts -> opts.advanced.useChunkFaceCulling)
                         .setImpact(OptionImpact.MEDIUM)
+                        .setBinding((opts, value) -> opts.advanced.useBlockFaceCulling = value, opts -> opts.advanced.useBlockFaceCulling)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 )
@@ -278,8 +285,8 @@ public class SodiumGameOptionPages {
                         .setName(I18n.format("sodium.options.use_entity_culling.name"))
                         .setTooltip(I18n.format("sodium.options.use_entity_culling.tooltip"))
                         .setControl(TickBoxControl::new)
-                        .setBinding((opts, value) -> opts.advanced.useAdvancedEntityCulling = value, opts -> opts.advanced.useAdvancedEntityCulling)
                         .setImpact(OptionImpact.MEDIUM)
+                        .setBinding((opts, value) -> opts.advanced.useEntityCulling = value, opts -> opts.advanced.useEntityCulling)
                         .build()
                 )
                 .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
@@ -294,34 +301,53 @@ public class SodiumGameOptionPages {
                         .setName(I18n.format("sodium.options.animate_only_visible_textures.name"))
                         .setTooltip(I18n.format("sodium.options.animate_only_visible_textures.tooltip"))
                         .setControl(TickBoxControl::new)
+                        .setImpact(OptionImpact.HIGH)
                         .setBinding((opts, value) -> opts.advanced.animateOnlyVisibleTextures = value, opts -> opts.advanced.animateOnlyVisibleTextures)
                         .setImpact(OptionImpact.MEDIUM)
                         .build()
                 )
-                .build());
-
-        groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
-                        .setName(I18n.format("sodium.options.use_memory_intrinsics.name"))
-                        .setTooltip(I18n.format("sodium.options.use_memory_intrinsics.tooltip"))
+                        .setName(I18n.format("sodium.options.translucency_sorting.name"))
+                        .setTooltip(I18n.format("sodium.options.translucency_sorting.tooltip"))
                         .setControl(TickBoxControl::new)
-                        .setEnabled(UnsafeUtil.isSupported())
-                        .setBinding((opts, value) -> opts.advanced.useMemoryIntrinsics = value, opts -> opts.advanced.useMemoryIntrinsics)
+                        .setBinding((opts, value) -> opts.advanced.translucencySorting = value, opts -> opts.advanced.translucencySorting)
+                        .setImpact(OptionImpact.HIGH)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
+                        .build()
+                )
+                .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
+                        .setName(I18n.format("sodium.options.leaves_culling.name"))
+                        .setTooltip(I18n.format("sodium.options.leaves_culling.tooltip"))
+                        .setControl(TickBoxControl::new)
+                        .setBinding((opts, value) -> opts.advanced.useLeavesCulling = value, opts -> opts.advanced.useLeavesCulling)
                         .setImpact(OptionImpact.MEDIUM)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 )
                 .build());
 
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
-                        .setName(I18n.format("sodium.options.disable_driver_blacklist.name"))
-                        .setTooltip(I18n.format("sodium.options.disable_driver_blacklist.tooltip"))
+                        .setName(I18n.format("sodium.options.allow_direct_memory_access.name"))
+                        .setTooltip(I18n.format("sodium.options.allow_direct_memory_access.tooltip"))
                         .setControl(TickBoxControl::new)
-                        .setBinding((opts, value) -> opts.advanced.disableDriverBlacklist = value, opts -> opts.advanced.disableDriverBlacklist)
+                        .setImpact(OptionImpact.HIGH)
+                        .setEnabled(UnsafeUtil.isSupported())
+                        .setBinding((opts, value) -> opts.advanced.allowDirectMemoryAccess = value, opts -> opts.advanced.allowDirectMemoryAccess)
                         .build()
-
                 )
                 .build());
-        return new OptionPage(I18n.format("sodium.options.pages.advanced"), ImmutableList.copyOf(groups));
+
+        groups.add(OptionGroup.createBuilder()
+                .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
+                        .setName(I18n.format("sodium.options.ignore_driver_disallowlist.name"))
+                        .setTooltip(I18n.format("sodium.options.ignore_driver_disallowlist.tooltip"))
+                        .setControl(TickBoxControl::new)
+                        .setBinding((opts, value) -> opts.advanced.ignoreDriverBlacklist = value, opts -> opts.advanced.ignoreDriverBlacklist)
+                        .build()
+                )
+                .build());
+
+        return new OptionPage("Advanced", ImmutableList.copyOf(groups));
     }
 }

@@ -31,4 +31,8 @@ public class GlFunctions {
     public static boolean isSamplerSupported() {
         return SAMPLER != GlSamplerFunctions.UNSUPPORTED;
     }
+
+    public static boolean isIndirectMultiDrawCountSupported() {
+        return INDIRECT_DRAW == GlIndirectMultiDrawFunctions.CORE_46;
+    }
 }

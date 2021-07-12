@@ -1,8 +1,11 @@
 package me.jellysquid.mods.sodium.mixin.features.buffer_builder.intrinsics;
 
 import com.mojang.blaze3d.vertex.IVertexBuilder;
-import me.jellysquid.mods.sodium.client.model.consumer.ParticleVertexConsumer;
-import me.jellysquid.mods.sodium.client.model.consumer.QuadVertexConsumer;
+import me.jellysquid.mods.sodium.client.model.vertex.VanillaVertexTypes;
+import me.jellysquid.mods.sodium.client.model.vertex.VertexDrain;
+import me.jellysquid.mods.sodium.client.model.vertex.VertexSink;
+import me.jellysquid.mods.sodium.client.model.vertex.transformers.SpriteTexturedVertexTransformer;
+import me.jellysquid.mods.sodium.client.model.vertex.type.VertexType;
 import net.minecraft.client.renderer.SpriteAwareVertexBuilder;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.spongepowered.asm.mixin.Final;
@@ -10,29 +13,29 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(SpriteAwareVertexBuilder.class)
-public abstract class MixinSpriteTexturedVertexConsumer implements QuadVertexConsumer, ParticleVertexConsumer {
-    @Shadow
-    @Final
-    private IVertexBuilder vertexBuilder;
-
+public abstract class MixinSpriteTexturedVertexConsumer implements VertexDrain {
     @Shadow
     @Final
     private TextureAtlasSprite atlasSprite;
 
+    @Shadow
+    @Final
+    private IVertexBuilder vertexBuilder;
+
+    @SuppressWarnings("unchecked")
     @Override
-    public void vertexQuad(float x, float y, float z, int color, float u, float v, int light, int overlay, int norm) {
-        u = this.atlasSprite.getInterpolatedU(u * 16.0F);
-        v = this.atlasSprite.getInterpolatedV(v * 16.0F);
+    public <T extends VertexSink> T createSink(VertexType<T> type) {
+        if (type == VanillaVertexTypes.QUADS) {
+            return (T) new SpriteTexturedVertexTransformer.Quad(VertexDrain.of(this.vertexBuilder)
+                    .createSink(VanillaVertexTypes.QUADS), this.atlasSprite);
+        } else if (type == VanillaVertexTypes.PARTICLES) {
+            return (T) new SpriteTexturedVertexTransformer.Particle(VertexDrain.of(this.vertexBuilder)
+                    .createSink(VanillaVertexTypes.PARTICLES), this.atlasSprite);
+        } else if (type == VanillaVertexTypes.GLYPHS) {
+            return (T) new SpriteTexturedVertexTransformer.Glyph(VertexDrain.of(this.vertexBuilder)
+                    .createSink(VanillaVertexTypes.GLYPHS), this.atlasSprite);
+        }
 
-        ((QuadVertexConsumer) this.vertexBuilder).vertexQuad(x, y, z, color, u, v, light, overlay, norm);
+        return type.createFallbackWriter((IVertexBuilder) this);
     }
-
-    @Override
-    public void vertexParticle(float x, float y, float z, float u, float v, int color, int light) {
-        u = this.atlasSprite.getInterpolatedU(u * 16.0F);
-        v = this.atlasSprite.getInterpolatedV(v * 16.0F);
-
-        ((ParticleVertexConsumer) this.vertexBuilder).vertexParticle(x, y, z, u, v, color, light);
-    }
-
 }

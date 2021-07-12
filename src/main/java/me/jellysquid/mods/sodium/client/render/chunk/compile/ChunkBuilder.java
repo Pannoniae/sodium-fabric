@@ -1,25 +1,25 @@
 package me.jellysquid.mods.sodium.client.render.chunk.compile;
 
-import me.jellysquid.mods.sodium.client.gl.attribute.GlVertexFormat;
+import lombok.extern.log4j.Log4j2;
+import me.jellysquid.mods.sodium.client.gl.device.RenderDevice;
+import me.jellysquid.mods.sodium.client.model.vertex.type.ChunkVertexType;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkGraphicsState;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderBackend;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderContainer;
+import me.jellysquid.mods.sodium.client.render.chunk.passes.BlockRenderPassManager;
 import me.jellysquid.mods.sodium.client.render.chunk.tasks.ChunkRenderBuildTask;
 import me.jellysquid.mods.sodium.client.render.chunk.tasks.ChunkRenderEmptyBuildTask;
 import me.jellysquid.mods.sodium.client.render.chunk.tasks.ChunkRenderRebuildTask;
-import me.jellysquid.mods.sodium.client.render.pipeline.context.ChunkRenderContext;
+import me.jellysquid.mods.sodium.client.render.pipeline.context.ChunkRenderCacheLocal;
 import me.jellysquid.mods.sodium.client.util.task.CancellationSource;
-import me.jellysquid.mods.sodium.client.world.ClientWorldExtended;
 import me.jellysquid.mods.sodium.client.world.WorldSlice;
-import me.jellysquid.mods.sodium.client.world.biome.BiomeCacheManager;
+import me.jellysquid.mods.sodium.client.world.cloned.ChunkRenderContext;
+import me.jellysquid.mods.sodium.client.world.cloned.ClonedChunkSectionCache;
 import me.jellysquid.mods.sodium.common.util.collections.DequeDrain;
-import me.jellysquid.mods.sodium.common.util.pool.ObjectPool;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.SectionPos;
 import net.minecraft.util.math.vector.Vector3d;
 import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -30,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+@Log4j2
 public class ChunkBuilder<T extends ChunkGraphicsState> {
     /**
      * The maximum number of jobs that can be queued for a given worker thread.
@@ -46,21 +47,20 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final List<Thread> threads = new ArrayList<>();
 
-    private final ObjectPool<WorldSlice> pool;
+    private ClonedChunkSectionCache sectionCache;
 
     private World world;
     private Vector3d cameraPosition;
-    private BiomeCacheManager biomeCacheManager;
+    private BlockRenderPassManager renderPassManager;
 
     private final int limitThreads;
-    private final GlVertexFormat<?> format;
+    private final ChunkVertexType vertexType;
     private final ChunkRenderBackend<T> backend;
 
-    public ChunkBuilder(GlVertexFormat<?> format, ChunkRenderBackend<T> backend) {
-        this.format = format;
+    public ChunkBuilder(ChunkVertexType vertexType, ChunkRenderBackend<T> backend) {
+        this.vertexType = vertexType;
         this.backend = backend;
         this.limitThreads = getOptimalThreadCount();
-        this.pool = new ObjectPool<>(this.getSchedulingBudget(), WorldSlice::new);
     }
 
     /**
@@ -87,8 +87,8 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
         Minecraft client = Minecraft.getInstance();
 
         for (int i = 0; i < this.limitThreads; i++) {
-            ChunkBuildBuffers buffers = new ChunkBuildBuffers(this.format);
-            ChunkRenderContext pipeline = new ChunkRenderContext(client);
+            ChunkBuildBuffers buffers = new ChunkBuildBuffers(this.vertexType, this.renderPassManager);
+            ChunkRenderCacheLocal pipeline = new ChunkRenderCacheLocal(client, this.world);
 
             WorkerRunnable worker = new WorkerRunnable(buffers, pipeline);
 
@@ -143,8 +143,7 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
         this.buildQueue.clear();
 
         this.world = null;
-        this.biomeCacheManager = null;
-        this.pool.reset();
+        this.sectionCache = null;
     }
 
     /**
@@ -156,7 +155,7 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
             return false;
         }
 
-        this.backend.uploadChunks(new DequeDrain<>(this.uploadQueue));
+        this.backend.upload(RenderDevice.INSTANCE.createCommandList(), new DequeDrain<>(this.uploadQueue));
 
         return true;
     }
@@ -203,8 +202,9 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
      * a world teleportation event), the worker threads will first be stopped and all pending tasks will be discarded
      * before being started again.
      * @param world The world instance
+     * @param renderPassManager The render pass manager used for the world
      */
-    public void init(ClientWorld world) {
+    public void init(ClientWorld world, BlockRenderPassManager renderPassManager) {
         if (world == null) {
             throw new NullPointerException("World is null");
         }
@@ -212,7 +212,8 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
         this.stopWorkers();
 
         this.world = world;
-        this.biomeCacheManager = new BiomeCacheManager(world.getDimensionType().getMagnifier(), ((ClientWorldExtended) world).getBiomeSeed());
+        this.renderPassManager = renderPassManager;
+        this.sectionCache = new ClonedChunkSectionCache(this.world);
 
         this.startWorkers();
     }
@@ -223,49 +224,6 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
      */
     private static int getOptimalThreadCount() {
         return Math.max(1, Runtime.getRuntime().availableProcessors());
-    }
-
-    /**
-     * Creates a {@link WorldSlice} around the given chunk section. If the chunk section is empty, null is returned.
-     * @param pos The position of the chunk section
-     * @return A world slice containing the section's context for rendering, or null if it has none
-     */
-    public WorldSlice createWorldSlice(SectionPos pos) {
-        Chunk[] chunks = WorldSlice.createChunkSlice(this.world, pos);
-
-        if (chunks == null) {
-            return null;
-        }
-
-        WorldSlice slice = this.pool.allocate();
-        slice.init(this, this.world, pos, chunks);
-
-        return slice;
-    }
-
-    /**
-     * Releases a world slice from a build task back to this builder's object pool.
-     * @param slice The chunk slice to release
-     */
-    public void releaseWorldSlice(WorldSlice slice) {
-        this.pool.release(slice);
-    }
-
-    /**
-     * Returns the global biome cache for this world
-     */
-    public BiomeCacheManager getBiomeCacheManager() {
-        return this.biomeCacheManager;
-    }
-
-    /**
-     * Called after a chunk's status is changed in the world (i.e. after a load or unload.) This is used to reset any
-     * caches which depend on its data and to release any pooled resources attached to it.
-     * @param x The x-position of the chunk
-     * @param z The z-position of the chunk
-     */
-    public void onChunkStatusChanged(int x, int z) {
-        this.biomeCacheManager.dropCachesForChunk(x, z);
     }
 
     /**
@@ -304,13 +262,17 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
     private ChunkRenderBuildTask<T> createRebuildTask(ChunkRenderContainer<T> render) {
         render.cancelRebuildTask();
 
-        WorldSlice slice = this.createWorldSlice(render.getChunkPos());
+        ChunkRenderContext context = WorldSlice.prepare(this.world, render.getChunkPos(), this.sectionCache);
 
-        if (slice == null) {
+        if (context == null) {
             return new ChunkRenderEmptyBuildTask<>(render);
         } else {
-            return new ChunkRenderRebuildTask<>(this, this.backend, render, slice);
+            return new ChunkRenderRebuildTask<>(render, context, render.getRenderOrigin(), cameraPosition);
         }
+    }
+
+    public void onChunkDataChanged(int x, int y, int z) {
+        this.sectionCache.invalidate(x, y, z);
     }
 
     private class WorkerRunnable implements Runnable {
@@ -321,11 +283,11 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
 
         // Making this thread-local provides a small boost to performance by avoiding the overhead in synchronizing
         // caches between different CPU cores
-        private final ChunkRenderContext pipeline;
+        private final ChunkRenderCacheLocal cache;
 
-        public WorkerRunnable(ChunkBuildBuffers bufferCache, ChunkRenderContext pipeline) {
+        public WorkerRunnable(ChunkBuildBuffers bufferCache, ChunkRenderCacheLocal cache) {
             this.bufferCache = bufferCache;
-            this.pipeline = pipeline;
+            this.cache = cache;
         }
 
         @Override
@@ -339,11 +301,19 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
                     continue;
                 }
 
-                // Perform the build task with this worker's local resources and obtain the result
-                ChunkBuildResult<T> result = job.task.performBuild(this.pipeline, this.bufferCache, job);
+                ChunkBuildResult<T>  result;
 
-                // After the result has been obtained, it's safe to release any resources attached to the task
-                job.task.releaseResources();
+                try {
+                    // Perform the build task with this worker's local resources and obtain the result
+                    result = job.task.performBuild(this.cache, this.bufferCache, job);
+                } catch (Exception e) {
+                    // Propagate any exception from chunk building
+                    log.error("Job completed exceptionally", e);
+                    job.future.completeExceptionally(e);
+                    continue;
+                } finally {
+                    job.task.releaseResources();
+                }
 
                 // The result can be null if the task is cancelled
                 if (result != null) {
@@ -367,7 +337,8 @@ public class ChunkBuilder<T extends ChunkGraphicsState> {
                 synchronized (ChunkBuilder.this.jobNotifier) {
                     try {
                         ChunkBuilder.this.jobNotifier.wait();
-                    } catch (InterruptedException ignored) {
+                    } catch (InterruptedException e) {
+                        LOGGER.error("ChunkBuilder Thread interrupted", e);
                     }
                 }
             }

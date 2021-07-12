@@ -13,7 +13,7 @@ import net.minecraft.client.renderer.WorldVertexBufferUploader;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.util.math.vector.Matrix4f;
 import org.apache.commons.lang3.Validate;
-import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20C;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -99,7 +99,7 @@ public abstract class MixinDebugHud {
         float k = (float) (color & 255) / 255.0F;
 
         BufferBuilder bufferBuilder = Tessellator.getInstance().getBuffer();
-        bufferBuilder.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
+        bufferBuilder.begin(GL20C.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
 
         Matrix4f matrix = matrixStack.getLast()
                 .getMatrix();
